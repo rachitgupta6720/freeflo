@@ -148,6 +148,40 @@
   .brand{font-weight:700;color:#fff;font-size:1.05rem;letter-spacing:-.01em}
   .foot-links{display:flex;gap:22px;flex-wrap:wrap}
 
+  /* privacy */
+  .privacy{background:var(--paper)}
+  .privacy .wrap{display:grid;grid-template-columns:.92fr 1.08fr;gap:56px;align-items:center}
+  .privacy .lock{font-size:2rem;margin:0 0 16px;display:block;line-height:1}
+  .privacy h2{max-width:15ch}
+  .priv-points{list-style:none;padding:0;margin:0;display:grid;gap:20px}
+  .priv-points li{display:grid;grid-template-columns:26px 1fr;gap:14px;align-items:start}
+  .priv-points .chk{color:var(--teal);font-weight:700;font-size:1.05rem;line-height:1.35}
+  .priv-points b{display:block;font-size:1.05rem;margin-bottom:3px;color:var(--text)}
+  .priv-points p{color:var(--muted);font-size:.96rem;margin:0}
+  .priv-points .path{white-space:nowrap}
+
+  /* compare */
+  .compare{background:var(--ink);color:#EDEFF2}
+  .compare h2{color:#fff}.compare .kicker{color:#7FD9D3}.compare .sec-lede{color:var(--muted-dark)}
+  .price-band{display:flex;flex-wrap:wrap;gap:18px;margin-top:44px}
+  .pcard{flex:1;min-width:230px;border-radius:16px;padding:26px 28px;border:1px solid var(--line-dark);background:var(--ink-soft)}
+  .pcard.free{background:linear-gradient(180deg,rgba(255,75,62,.16),rgba(255,75,62,.03));border-color:rgba(255,75,62,.45)}
+  .pcard .who{font-family:var(--mono);font-size:.76rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-dark)}
+  .pcard .amt{font-size:2.5rem;font-weight:700;letter-spacing:-.03em;margin:10px 0 4px;color:#fff}
+  .pcard.free .amt{color:var(--red)}
+  .pcard .sub{color:var(--muted-dark);font-size:.9rem}
+  .table-wrap{overflow-x:auto;margin-top:32px;border:1px solid var(--line-dark);border-radius:16px}
+  table.cmp{width:100%;border-collapse:collapse;min-width:540px}
+  table.cmp th,table.cmp td{padding:15px 20px;text-align:left;border-bottom:1px solid var(--line-dark);font-size:.95rem;vertical-align:top}
+  table.cmp thead th{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-dark);font-weight:600}
+  table.cmp thead th.ff{color:var(--red)}
+  table.cmp tbody th{font-weight:500;color:#B7BDC6}
+  table.cmp td.ff{color:#fff;font-weight:600;background:rgba(255,75,62,.06)}
+  table.cmp td.other{color:var(--muted-dark)}
+  table.cmp tr:last-child td,table.cmp tr:last-child th{border-bottom:none}
+  .yes{color:#37D39B;font-weight:700}.no{color:#8C929C;font-weight:700}
+  .cmp-note{margin-top:16px;font-size:.82rem;color:var(--muted-dark);max-width:70ch}
+
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,75,62,.5)}70%{box-shadow:0 0 0 9px rgba(255,75,62,0)}100%{box-shadow:0 0 0 0 rgba(255,75,62,0)}}
   @keyframes blink{50%{opacity:0}}
 
@@ -157,6 +191,7 @@
     .steps{grid-template-columns:1fr}
     .grid{grid-template-columns:1fr 1fr}
     .dl-head{grid-template-columns:1fr}
+    .privacy .wrap{grid-template-columns:1fr;gap:32px}
     section{padding:64px 0}
   }
   @media (max-width:540px){
@@ -193,7 +228,7 @@
         </a>
         <a class="btn btn-ghost" href="https://github.com/rachitgupta6720/freeflo">View source</a>
       </div>
-      <p class="hero-note">Free &amp; open source. <b>No account, no cloud, no subscription.</b> Apple Silicon &amp; Intel.</p>
+      <p class="hero-note"><b>Free forever.</b> No account, no cloud, no subscription, no word limits. Apple Silicon &amp; Intel.</p>
     </div>
 
     <div class="demo" aria-hidden="true">
@@ -276,6 +311,69 @@
   </div>
 </section>
 
+<section class="privacy">
+  <div class="wrap">
+    <div>
+      <p class="kicker">Private by design</p>
+      <span class="lock">🔒</span>
+      <h2>Your words never leave your Mac.</h2>
+      <p class="sec-lede">freeflo isn't private because a policy promises it. It's private because there is no server to send anything to — the speech model runs entirely on your own machine.</p>
+    </div>
+    <ul class="priv-points">
+      <li><span class="chk">✓</span>
+        <div><b>Nothing is ever uploaded</b>
+        <p>Your audio is transcribed on-device by whisper.cpp. No internet connection is used or required — it works on a plane.</p></div></li>
+      <li><span class="chk">✓</span>
+        <div><b>Your conversations stay yours</b>
+        <p>Dictate confidential emails, health notes, or client work — none of it touches a cloud, so none of it can be logged, leaked, or used to train a model.</p></div></li>
+      <li><span class="chk">✓</span>
+        <div><b>History is stored on your Mac and nowhere else</b>
+        <p>Transcripts live only in a private database on your machine <span class="path">(~/Library/Application Support/freeflo)</span>. Search it, clear it, or turn it off entirely.</p></div></li>
+      <li><span class="chk">✓</span>
+        <div><b>No account, no tracking</b>
+        <p>No sign-up, no telemetry, no analytics. freeflo doesn't know who you are — and never needs to.</p></div></li>
+    </ul>
+  </div>
+</section>
+
+<section class="compare">
+  <div class="wrap">
+    <p class="kicker">How it compares</p>
+    <h2>Everything you need. None of the subscription.</h2>
+    <p class="sec-lede">Cloud dictation apps like Wispr Flow are polished — but they stream your voice (and screenshots of your screen) to their servers, and bill you every month. freeflo does the core job on-device, for free, for life.</p>
+
+    <div class="price-band">
+      <div class="pcard free">
+        <div class="who">freeflo</div>
+        <div class="amt">$0</div>
+        <div class="sub">Free forever · open source · no limits</div>
+      </div>
+      <div class="pcard">
+        <div class="who">Wispr Flow — Pro</div>
+        <div class="amt">$15<span style="font-size:1rem;font-weight:500">/mo</span></div>
+        <div class="sub">or $144/yr · free tier capped at 2,000 words/week</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="cmp">
+        <thead><tr><th scope="col">&nbsp;</th><th scope="col" class="ff">freeflo</th><th scope="col">Wispr Flow</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Price</th><td class="ff">Free forever</td><td class="other">$15/mo · $144/yr</td></tr>
+          <tr><th scope="row">Word limit</th><td class="ff">Unlimited</td><td class="other">2,000 words/week (free tier)</td></tr>
+          <tr><th scope="row">Works offline</th><td class="ff"><span class="yes">✓</span> Fully offline</td><td class="other"><span class="no">✗</span> Internet required</td></tr>
+          <tr><th scope="row">Where your audio is processed</th><td class="ff">On your Mac</td><td class="other">Sent to their cloud</td></tr>
+          <tr><th scope="row">Captures your screen for context</th><td class="ff"><span class="yes">✓</span> Never</td><td class="other"><span class="no">✗</span> Yes, sent to cloud</td></tr>
+          <tr><th scope="row">Account required</th><td class="ff"><span class="yes">✓</span> No</td><td class="other"><span class="no">✗</span> Yes</td></tr>
+          <tr><th scope="row">Open source</th><td class="ff"><span class="yes">✓</span> Yes (MIT)</td><td class="other"><span class="no">✗</span> Proprietary</td></tr>
+          <tr><th scope="row">Cost over 3 years</th><td class="ff">$0</td><td class="other">~$432</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cmp-note">Wispr Flow pricing and features as of July 2026 (wisprflow.ai and its docs). In fairness, Wispr Flow offers cloud-side AI cleanup and formatting that freeflo doesn't — freeflo's trade is simple: your speech, on your machine, at no cost.</p>
+  </div>
+</section>
+
 <section class="dl" id="download">
   <div class="wrap">
     <div class="dl-head">
@@ -347,7 +445,7 @@
   <div class="wrap">
     <div>
       <div class="brand">freeflo</div>
-      <div style="margin-top:6px">Offline dictation for macOS · MIT licensed</div>
+      <div style="margin-top:6px">Offline dictation for macOS · Free forever · MIT licensed</div>
     </div>
     <nav class="foot-links">
       <a href="https://github.com/rachitgupta6720/freeflo">GitHub</a>
