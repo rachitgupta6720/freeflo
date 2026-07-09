@@ -1,0 +1,17 @@
+# Runtime dependencies for freeflo (macOS).
+# Install into a virtualenv:  pip install -r requirements.txt
+
+rumps>=0.4.0                        # macOS menu-bar app framework
+sounddevice>=0.5.0                  # microphone capture (bundles PortAudio + cffi)
+numpy>=2.0                          # audio buffer handling
+scipy>=1.13                         # WAV file writing
+pyperclip>=1.9                      # clipboard-based text injection
+
+# PyObjC bridges (pull in pyobjc-core automatically)
+pyobjc-framework-Cocoa>=10.0
+pyobjc-framework-Quartz>=10.0       # CGEventTap hotkey listener
+pyobjc-framework-WebKit>=10.0       # history/settings window
+pyobjc-framework-ApplicationServices>=10.0  # Accessibility permission check
+
+# Building a standalone .app bundle (optional — see README "Building")
+# py2app>=0.28

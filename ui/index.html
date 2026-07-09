@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>freeflo</title>
+<style>
+  :root {
+    --blue: #1f6bff;
+    --bg: #0d1220;
+    --panel: #151b2e;
+    --panel2: #1c2440;
+    --text: #eef2ff;
+    --muted: #9aa6c7;
+    --line: #263056;
+    --rec: #ff4d4f;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.55 -apple-system, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--blue);
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 18px; color: #fff;
+  }
+  .brand { font-size: 17px; font-weight: 700; }
+  nav { margin-left: auto; display: flex; gap: 4px; }
+  nav button {
+    border: none; background: transparent; color: var(--muted);
+    padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer;
+  }
+  nav button.active { background: var(--panel2); color: var(--text); }
+  main { flex: 1; overflow: auto; padding: 28px 22px; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  /* Test tab */
+  .test-wrap { max-width: 640px; margin: 0 auto; text-align: center; }
+  .record-btn {
+    width: 132px; height: 132px; border-radius: 50%;
+    border: none; cursor: pointer; margin: 18px auto 8px;
+    background: var(--blue); color: #fff;
+    font-size: 15px; font-weight: 650;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .08s ease, background .2s ease;
+    box-shadow: 0 8px 30px rgba(31,107,255,.35);
+  }
+  .record-btn:active { transform: scale(.96); }
+  .record-btn.recording { background: var(--rec); box-shadow: 0 8px 30px rgba(255,77,79,.4); animation: pulse 1.4s infinite; }
+  .record-btn:disabled { opacity: .6; cursor: default; animation: none; }
+  @keyframes pulse { 0%,100%{ box-shadow:0 8px 30px rgba(255,77,79,.4);} 50%{ box-shadow:0 8px 44px rgba(255,77,79,.7);} }
+  .status { color: var(--muted); min-height: 20px; margin-bottom: 18px; }
+  .result {
+    -webkit-user-select: text; user-select: text;
+    text-align: left; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px 20px; min-height: 96px;
+    font-size: 16px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  }
+  .result.empty { color: var(--muted); }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 14px; }
+
+  .placeholder { max-width: 520px; margin: 60px auto; text-align: center; color: var(--muted); }
+  .placeholder h2 { color: var(--text); font-weight: 700; }
+
+  /* History tab */
+  .history-wrap { max-width: 720px; margin: 0 auto; }
+  .history-top { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  #search {
+    -webkit-user-select: text; user-select: text; flex: 1;
+    padding: 10px 12px; font-size: 14px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; outline: none;
+  }
+  .switch { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; white-space: nowrap; cursor: pointer; }
+  .clear-btn {
+    padding: 10px 16px; font-size: 13px; color: var(--text);
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+  }
+  .clear-btn:active { transform: scale(.98); }
+  .history-list { display: flex; flex-direction: column; gap: 10px; }
+  .entry {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .entry-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .badge { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+  .entry-text { -webkit-user-select: text; user-select: text; white-space: pre-wrap; word-break: break-word; }
+  .copy { margin-left: auto; background: transparent; border: none; color: var(--blue); cursor: pointer; font-size: 12px; }
+  .empty-state { text-align: center; color: var(--muted); margin-top: 50px; }
+
+  /* Shortcuts tab */
+  .shortcuts-wrap { max-width: 560px; margin: 0 auto; }
+  .shortcuts-wrap h2 { margin: 0 0 4px; font-size: 20px; }
+  .sub { color: var(--muted); margin: 0 0 26px; }
+  .field { margin-bottom: 24px; }
+  .field label { display: block; font-weight: 650; margin-bottom: 8px; }
+  .tag {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    background: var(--panel2); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
+  }
+  select {
+    width: 100%; padding: 11px 12px; font-size: 14px;
+    color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; appearance: none; cursor: pointer;
+  }
+  .desc { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  .save-btn {
+    margin-top: 8px; padding: 11px 22px; font-size: 14px; font-weight: 650;
+    color: #fff; background: var(--blue); border: none; border-radius: 10px; cursor: pointer;
+  }
+  .save-btn:active { transform: scale(.98); }
+  .save-msg { margin-top: 12px; min-height: 18px; font-size: 13px; }
+  .save-msg.ok { color: #57d979; }
+  .save-msg.err { color: #ff7a7c; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">F</div>
+    <div class="brand">freeflo</div>
+    <nav>
+      <button data-tab="test" class="active">Test</button>
+      <button data-tab="history">History</button>
+      <button data-tab="shortcuts">Shortcuts</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="tab active" id="tab-test">
+      <div class="test-wrap">
+        <button id="rec" class="record-btn">Start<br>recording</button>
+        <div class="status" id="status">Tap to record a test — nothing is pasted here.</div>
+        <div class="result empty" id="result">Your transcription will appear here.</div>
+        <div class="hint">Uses the same engine as dictation. Change the language from the menu-bar icon.</div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-history">
+      <div class="history-wrap">
+        <div class="history-top">
+          <input id="search" type="search" placeholder="Search history…">
+          <label class="switch">
+            <input type="checkbox" id="saveToggle">
+            <span>Save history</span>
+          </label>
+          <button id="clear" class="clear-btn">Clear</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-shortcuts">
+      <div class="shortcuts-wrap">
+        <h2>Shortcuts</h2>
+        <p class="sub">Choose which key does each action. Changes apply immediately — no restart.</p>
+
+        <div class="field">
+          <label for="ptt">Push-to-talk <span class="tag">hold</span></label>
+          <select id="ptt"></select>
+          <div class="desc">Record only while the key is held down; release to transcribe.</div>
+        </div>
+
+        <div class="field">
+          <label for="toggle">Toggle <span class="tag">tap</span></label>
+          <select id="toggle"></select>
+          <div class="desc">Tap once to start recording, tap again to stop.</div>
+        </div>
+
+        <button id="save" class="save-btn">Save</button>
+        <div class="save-msg" id="saveMsg"></div>
+      </div>
+    </section>
+  </main>
+
+<script>
+  // ---- bridge helpers ----
+  function send(action, extra) {
+    try {
+      window.webkit.messageHandlers.freeflo.postMessage(Object.assign({action}, extra || {}));
+    } catch (e) { /* not running inside the app */ }
+  }
+  // Python calls this: window.freefloReceive(name, payloadObject)
+  window.freefloReceive = function (name, payload) {
+    payload = payload || {};
+    if (name === 'status') onStatus(payload);
+    else if (name === 'test_result') onResult(payload);
+    else if (name === 'shortcuts') onShortcuts(payload);
+    else if (name === 'shortcuts_saved') onShortcutsSaved(payload);
+    else if (name === 'history') onHistory(payload);
+    else if (name === 'save_history_state') { saveToggle.checked = !!payload.on; }
+  };
+
+  // ---- tabs ----
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b === btn));
+      const id = btn.dataset.tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + id));
+      if (id === 'shortcuts') send('get_shortcuts');
+      if (id === 'history') send('get_history', { query: search.value.trim() });
+    });
+  });
+
+  // ---- test tab ----
+  const rec = document.getElementById('rec');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  let state = 'idle'; // idle | recording | processing
+
+  rec.addEventListener('click', () => {
+    if (state === 'idle') {
+      send('test_start');
+      // optimistic; Python confirms via status
+    } else if (state === 'recording') {
+      send('test_stop');
+      setState('processing');
+    }
+  });
+
+  function setState(s) {
+    state = s;
+    if (s === 'recording') {
+      rec.classList.add('recording'); rec.disabled = false;
+      rec.innerHTML = 'Stop';
+      statusEl.textContent = '● Recording… tap to stop';
+    } else if (s === 'processing') {
+      rec.classList.remove('recording'); rec.disabled = true;
+      rec.innerHTML = 'Working…';
+      statusEl.textContent = 'Transcribing…';
+    } else { // idle
+      rec.classList.remove('recording'); rec.disabled = false;
+      rec.innerHTML = 'Start<br>recording';
+      statusEl.textContent = 'Tap to record a test — nothing is pasted here.';
+    }
+  }
+
+  function onStatus(p) {
+    if (p.state === 'recording') setState('recording');
+    else if (p.state === 'processing') setState('processing');
+    else if (p.state === 'busy') { setState('idle'); statusEl.textContent = p.message || 'Busy…'; }
+    else setState('idle');
+  }
+
+  function onResult(p) {
+    setState('idle');
+    const text = (p.text || '').trim();
+    if (text) {
+      resultEl.classList.remove('empty');
+      resultEl.textContent = text;
+      statusEl.textContent = 'Done.';
+    } else {
+      resultEl.classList.add('empty');
+      resultEl.textContent = p.note || 'Nothing heard — try again.';
+    }
+  }
+
+  // ---- shortcuts tab ----
+  const pttSel = document.getElementById('ptt');
+  const toggleSel = document.getElementById('toggle');
+  const saveBtn = document.getElementById('save');
+  const saveMsg = document.getElementById('saveMsg');
+
+  function fillSelect(sel, keys, selected) {
+    sel.innerHTML = '';
+    keys.forEach(k => {
+      const o = document.createElement('option');
+      o.value = k.id; o.textContent = k.label;
+      if (k.id === selected) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  function onShortcuts(p) {
+    const keys = p.keys || [];
+    fillSelect(pttSel, keys, p.ptt_key);
+    fillSelect(toggleSel, keys, p.toggle_key);
+  }
+
+  function onShortcutsSaved(p) {
+    if (p.ok) {
+      saveMsg.className = 'save-msg ok';
+      saveMsg.textContent = 'Saved — active now.';
+    } else {
+      saveMsg.className = 'save-msg err';
+      saveMsg.textContent = p.error || 'Could not save.';
+    }
+    setTimeout(() => { saveMsg.textContent = ''; }, 3000);
+  }
+
+  saveBtn.addEventListener('click', () => {
+    send('set_shortcuts', { ptt_key: pttSel.value, toggle_key: toggleSel.value });
+  });
+
+  // Load current shortcuts on startup too (in case Shortcuts is the first tab viewed).
+  send('get_shortcuts');
+
+  // ---- history tab ----
+  const search = document.getElementById('search');
+  const saveToggle = document.getElementById('saveToggle');
+  const clearBtn = document.getElementById('clear');
+  const historyList = document.getElementById('historyList');
+  const LANG = { en:'English', hi:'Hindi', auto:'Auto', es:'Spanish', fr:'French',
+                 de:'German', zh:'Chinese', ja:'Japanese', ar:'Arabic', pt:'Portuguese' };
+
+  function fmtTime(epoch) {
+    if (!epoch) return '';
+    const d = new Date(epoch * 1000);
+    return d.toLocaleString([], { month:'short', day:'numeric',
+      hour:'2-digit', minute:'2-digit' });
+  }
+
+  function onHistory(p) {
+    saveToggle.checked = p.save_history !== false;
+    const entries = p.entries || [];
+    if (!entries.length) {
+      historyList.innerHTML = '<div class="empty-state">' +
+        (search.value.trim() ? 'No matches.' : 'No history yet. Dictate something!') + '</div>';
+      return;
+    }
+    historyList.innerHTML = '';
+    entries.forEach(e => {
+      const el = document.createElement('div');
+      el.className = 'entry';
+      const meta = document.createElement('div');
+      meta.className = 'entry-meta';
+      const lang = LANG[e.language] || e.language || '';
+      meta.innerHTML = '<span>' + fmtTime(e.ts) + '</span>' +
+        (lang ? '<span class="badge">' + lang + '</span>' : '') +
+        (e.mode === 'test' ? '<span class="badge">test</span>' : '');
+      const copy = document.createElement('button');
+      copy.className = 'copy'; copy.textContent = 'Copy';
+      copy.addEventListener('click', () => {
+        navigator.clipboard && navigator.clipboard.writeText(e.text);
+        copy.textContent = 'Copied'; setTimeout(() => copy.textContent = 'Copy', 1200);
+      });
+      meta.appendChild(copy);
+      const txt = document.createElement('div');
+      txt.className = 'entry-text'; txt.textContent = e.text;
+      el.appendChild(meta); el.appendChild(txt);
+      historyList.appendChild(el);
+    });
+  }
+
+  let searchTimer = null;
+  search.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => send('get_history', { query: search.value.trim() }), 200);
+  });
+  saveToggle.addEventListener('change', () => send('set_save_history', { on: saveToggle.checked }));
+  clearBtn.addEventListener('click', () => {
+    if (confirm('Clear all dictation history? This cannot be undone.')) send('clear_history');
+  });
+</script>
+</body>
+</html>
