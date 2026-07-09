@@ -22,20 +22,6 @@
   img{max-width:100%}
   .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 
-  /* faux menu bar */
-  .menubar{
-    position:sticky;top:0;z-index:50;height:30px;
-    background:rgba(20,22,27,.72);backdrop-filter:saturate(160%) blur(14px);
-    -webkit-backdrop-filter:saturate(160%) blur(14px);
-    border-bottom:1px solid var(--line-dark);
-    display:flex;align-items:center;justify-content:flex-end;
-    padding:0 16px;gap:18px;color:#EDEFF2;font-size:12.5px;
-  }
-  .menubar .spacer{margin-right:auto;font-weight:600;letter-spacing:.02em;opacity:.72}
-  .menubar .mb-item{opacity:.7}
-  .menubar .mic{font-size:14px;filter:grayscale(.1)}
-  .menubar time{font-variant-numeric:tabular-nums;opacity:.7}
-
   /* hero */
   .hero{background:var(--ink);color:#F3F5F8;position:relative;overflow:hidden}
   .hero::after{content:"";position:absolute;inset:0;pointer-events:none;
@@ -196,7 +182,6 @@
   }
   @media (max-width:540px){
     .grid{grid-template-columns:1fr}
-    .menubar .mb-item{display:none}
     .istep{grid-template-columns:1fr;gap:10px}
   }
   @media (prefers-reduced-motion:reduce){
@@ -207,14 +192,6 @@
 </style>
 </head>
 <body>
-
-<div class="menubar">
-  <span class="spacer">freeflo</span>
-  <span class="mb-item">🔋 82%</span>
-  <span class="mb-item">🛜</span>
-  <span class="mic mb-item" title="freeflo lives here">🎙</span>
-  <time>9:41 AM</time>
-</div>
 
 <header class="hero">
   <div class="wrap">
