@@ -56,6 +56,24 @@ OPTIONS = {
         'Quartz',
         'ApplicationServices',
         'CoreText',
+        # Google Drive backup — OAuth + REST, hand-rolled to skip the much
+        # heavier google-api-python-client (httplib2, discovery docs, etc).
+        'google',
+        'google.auth',
+        'google.oauth2',
+        'google_auth_oauthlib',
+        'requests_oauthlib',
+        'oauthlib',
+        'requests',
+        'urllib3',
+        'certifi',
+        'idna',
+        'charset_normalizer',
+        'cachetools',
+        'pyasn1',
+        'pyasn1_modules',
+        'rsa',
+        'keyring',
     ],
     'includes': [
         'config',
@@ -63,6 +81,8 @@ OPTIONS = {
         'engine.recorder',
         'engine.transcriber',
         'engine.injector',
+        'engine.gauth',
+        'engine.backup',
         # cffi C extension
         '_cffi_backend',
     ],

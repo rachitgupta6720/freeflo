@@ -14,6 +14,9 @@ _DEFAULTS = {
     'ptt_key': 'left_option',    # push-to-talk (hold) key
     'toggle_key': 'right_option',  # toggle (tap on/off) key
     'save_history': True,        # log transcriptions to the local history DB
+    'backup_enabled': False,      # sync history to the user's Google Drive
+    'backup_account_email': None,  # cached, so the UI can show it without a network call
+    'backup_last_synced': None,   # epoch seconds of the last successful sync
 }
 
 # Selectable hotkey keys. Each carries the virtual keycode of the physical key

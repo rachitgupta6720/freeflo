@@ -10,7 +10,7 @@ import config as cfg
 from engine.recorder import Recorder
 from engine.transcriber import transcribe
 from engine.injector import inject
-from engine import history
+from engine import history, gauth, backup
 from hotkey import HotkeyListener
 
 _ICONS = {
@@ -75,6 +75,9 @@ class FreefloApp(rumps.App):
         self._toggle_lock = threading.Lock()
         self._is_recording = False    # guarded by _toggle_lock
         self._record_mode = None      # 'ptt' | 'toggle' | None, guarded by _toggle_lock
+
+        # Guards against overlapping backup syncs (e.g. rapid-fire dictation).
+        self._backup_lock = threading.Lock()
 
         ptt = cfg.resolve_key(settings.get('ptt_key', 'left_option'))
         tog = cfg.resolve_key(settings.get('toggle_key', 'right_option'))
@@ -155,6 +158,9 @@ class FreefloApp(rumps.App):
         # Delay the permission prompt 1 s so the NSApp run loop is active.
         if not self._has_accessibility:
             rumps.Timer(self._prompt_accessibility_once, 1.0).start()
+
+        # Catch up on any backup that happened on another Mac since we last ran.
+        self._maybe_sync_backup()
 
     # ------------------------------------------------------------------
     # Thread-safe state helpers
@@ -299,6 +305,31 @@ class FreefloApp(rumps.App):
             settings['save_history'] = on
             cfg.save(settings)
             self._push_ui('save_history_state', {'on': on})
+        elif action == 'get_backup_status':
+            self._send_backup_status()
+        elif action == 'set_backup_enabled':
+            try:
+                on = bool(body.get('on'))
+            except Exception:
+                on = False
+            settings = cfg.load()
+            settings['backup_enabled'] = on
+            cfg.save(settings)
+            self._send_backup_status()
+            if on:
+                self._maybe_sync_backup(manual=True)
+        elif action == 'google_connect':
+            threading.Thread(target=self._connect_google, daemon=True).start()
+        elif action == 'google_disconnect':
+            try:
+                delete_remote = bool(body.get('delete_remote'))
+            except Exception:
+                delete_remote = False
+            threading.Thread(
+                target=self._disconnect_google, args=(delete_remote,), daemon=True
+            ).start()
+        elif action == 'backup_sync_now':
+            self._maybe_sync_backup(manual=True)
 
     def _send_history(self, query):
         try:
@@ -310,6 +341,84 @@ class FreefloApp(rumps.App):
             'entries': entries,
             'save_history': settings.get('save_history', True),
         })
+
+    # ------------------------------------------------------------------
+    # Google backup
+    # ------------------------------------------------------------------
+
+    def _send_backup_status(self, extra=None):
+        settings = cfg.load()
+        payload = {
+            'configured': gauth.is_configured(),
+            'connected': gauth.is_connected(),
+            'enabled': settings.get('backup_enabled', False),
+            'email': settings.get('backup_account_email'),
+            'last_synced': settings.get('backup_last_synced'),
+            'syncing': self._backup_lock.locked(),
+        }
+        if extra:
+            payload.update(extra)
+        self._push_ui('backup_status', payload)
+
+    def _connect_google(self):
+        """Runs the OAuth loopback flow on a background thread — it blocks
+        until the browser redirect lands, which would freeze the UI on the
+        main thread."""
+        try:
+            email = gauth.connect()
+        except gauth.NotConfigured as e:
+            self._send_backup_status({'error': str(e)})
+            return
+        except Exception as e:
+            self._send_backup_status({'error': f'Sign-in failed: {e}'})
+            return
+        settings = cfg.load()
+        settings['backup_account_email'] = email
+        settings['backup_enabled'] = True
+        cfg.save(settings)
+        self._send_backup_status()
+        self._maybe_sync_backup(manual=True)
+
+    def _disconnect_google(self, delete_remote):
+        try:
+            if delete_remote:
+                backup.delete_remote()
+        except Exception as e:
+            self._send_backup_status({'error': f'Could not delete Drive backup: {e}'})
+        gauth.disconnect()
+        settings = cfg.load()
+        settings['backup_enabled'] = False
+        settings['backup_account_email'] = None
+        settings['backup_last_synced'] = None
+        cfg.save(settings)
+        self._send_backup_status()
+
+    def _maybe_sync_backup(self, manual=False):
+        """Kick off a sync in the background if backup is on and connected.
+        `manual` only affects whether we report back "not connected" — the
+        automatic post-dictation trigger should stay silent."""
+        settings = cfg.load()
+        if not (settings.get('backup_enabled') and gauth.is_connected()):
+            if manual:
+                self._send_backup_status({'error': 'Connect Google Backup first.'})
+            return
+        if not self._backup_lock.acquire(blocking=False):
+            return
+        threading.Thread(target=self._sync_backup_worker, daemon=True).start()
+
+    def _sync_backup_worker(self):
+        self._send_backup_status()  # reflects syncing=True
+        try:
+            result = backup.sync()
+        except Exception as e:
+            self._backup_lock.release()
+            self._send_backup_status({'error': f'Sync failed: {e}'})
+            return
+        settings = cfg.load()
+        settings['backup_last_synced'] = result['synced_at']
+        cfg.save(settings)
+        self._backup_lock.release()
+        self._send_backup_status()
 
     def _send_shortcuts(self):
         settings = cfg.load()
@@ -504,6 +613,7 @@ class FreefloApp(rumps.App):
                         mode=mode, duration=duration)
         except Exception:
             pass
+        self._maybe_sync_backup()
 
 
 if __name__ == '__main__':
