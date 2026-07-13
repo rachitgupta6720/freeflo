@@ -68,6 +68,18 @@ ${NOTES}"
 
 # --- 4. build ---
 step "Building freeflo.app (py2app) — this takes a minute"
+# Bake in the Google OAuth client so the shipped app can offer backup — a
+# double-clicked app has no shell env to read FREEFLO_GOOGLE_* from. The file
+# is gitignored; setup.py bundles it into the app when present. Without the
+# env vars the build still succeeds and backup simply stays unavailable.
+if [ -n "${FREEFLO_GOOGLE_CLIENT_ID:-}" ] && [ -n "${FREEFLO_GOOGLE_CLIENT_SECRET:-}" ]; then
+    printf '{"client_id":"%s","client_secret":"%s"}' \
+        "$FREEFLO_GOOGLE_CLIENT_ID" "$FREEFLO_GOOGLE_CLIENT_SECRET" > google_client.json
+    echo "  baked in Google OAuth client (backup enabled in this build)"
+else
+    rm -f google_client.json
+    echo "  no FREEFLO_GOOGLE_* env vars set — building without backup credentials"
+fi
 rm -rf build dist
 "$PY" setup.py py2app >/dev/null
 [ -d dist/freeflo.app ] || die "Build did not produce dist/freeflo.app."
