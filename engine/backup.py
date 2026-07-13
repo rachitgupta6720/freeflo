@@ -82,13 +82,19 @@ def sync():
     for entry in remote_entries:
         history.upsert_from_remote(entry)
 
-    merged = history.all_entries_for_sync()
-    _upload(session, file_id, merged)
-
     now = time.time()
-    history.mark_synced([e['uuid'] for e in merged], now)
+    # Only re-upload when the local DB holds changes the backup doesn't have
+    # yet (new/edited/deleted rows), or when there's no backup file at all.
+    # A plain post-dictation sync that pulled nothing new skips the upload
+    # instead of re-sending the entire history every time.
+    pushed = 0
+    if history.dirty_entries() or file_id is None:
+        merged = history.all_entries_for_sync()
+        _upload(session, file_id, merged)
+        history.mark_synced([e['uuid'] for e in merged], now)
+        pushed = len(merged)
 
-    return {'pulled': len(remote_entries), 'total': len(merged), 'synced_at': now}
+    return {'pulled': len(remote_entries), 'pushed': pushed, 'synced_at': now}
 
 
 def delete_remote():

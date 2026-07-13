@@ -443,6 +443,12 @@
     backupDisconnected.style.display = (p.configured && !p.connected) ? '' : 'none';
     backupConnected.style.display = (p.configured && p.connected) ? '' : 'none';
 
+    // Reset the connect button whenever we get fresh status (e.g. sign-in
+    // finished, failed, or timed out) so it isn't stuck on "Connecting…".
+    const cb = document.getElementById('connectBtn');
+    cb.disabled = false;
+    cb.textContent = 'Connect Google Backup';
+
     if (p.connected) {
       backupEmail.textContent = p.email ? ('Signed in as ' + p.email) : '';
       backupEnabledToggle.checked = !!p.enabled;
@@ -455,7 +461,11 @@
     else { backupMsg.textContent = ''; }
   }
 
-  document.getElementById('connectBtn').addEventListener('click', () => send('google_connect'));
+  document.getElementById('connectBtn').addEventListener('click', (e) => {
+    e.target.disabled = true;
+    e.target.textContent = 'Connecting…';
+    send('google_connect');
+  });
   document.getElementById('syncNowBtn').addEventListener('click', () => send('backup_sync_now'));
   backupEnabledToggle.addEventListener('change', (e) => send('set_backup_enabled', { on: e.target.checked }));
   document.getElementById('disconnectBtn').addEventListener('click', () => {

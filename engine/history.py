@@ -169,7 +169,13 @@ def mark_synced(uuids, synced_at):
 def upsert_from_remote(entry):
     """Merge one remote entry into the local DB, last-write-wins on
     updated_at. The merged row is marked synced immediately since it now
-    matches the backup."""
+    matches the backup.
+
+    Note: updated_at is wall-clock time from whichever device wrote the row, so
+    a badly skewed clock on one Mac could let its writes win incorrectly. That's
+    acceptable here — entries are append-only plus soft-delete, never edited, so
+    the only real conflict is create-vs-delete of the same uuid, which is rare.
+    """
     conn = _connect()
     try:
         row = conn.execute(

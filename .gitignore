@@ -18,6 +18,9 @@ dist/
 whisper-cli
 *.bin
 
+# Google OAuth client baked into the build (holds the client secret) — never commit
+google_client.json
+
 # macOS
 .DS_Store
 

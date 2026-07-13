@@ -7,12 +7,14 @@ Keychain — never in a plain file — and only the narrow `drive.appdata` scope
 is requested for storage, which grants access to nothing in the user's Drive
 except a hidden, app-private folder freeflo creates itself.
 
-FREEFLO_GOOGLE_CLIENT_ID / FREEFLO_GOOGLE_CLIENT_SECRET come from a Google
-Cloud OAuth "Desktop app" client that the freeflo maintainer registers once;
-each user still signs in individually and only ever grants access to their
-own account. See README.md for how to create one.
+The OAuth "Desktop app" client comes from config.get_google_client() — either
+the FREEFLO_GOOGLE_CLIENT_ID / FREEFLO_GOOGLE_CLIENT_SECRET environment
+variables (run-from-source) or a google_client.json bundled into the .app at
+build time. The freeflo maintainer registers the client once; each user still
+signs in individually and only ever grants access to their own account. See
+README.md for how to create one.
 """
-import os
+import config
 
 import keyring
 import keyring.errors
@@ -20,6 +22,16 @@ import requests
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+
+# In a packaged .app, keyring can't discover its backend through entry-point
+# metadata (py2app doesn't bundle it), so it would fail to find the Keychain
+# and raise NoKeyringError at runtime. Pin the macOS backend explicitly; this
+# is a no-op when running from source.
+try:
+    import keyring.backends.macOS
+    keyring.set_keyring(keyring.backends.macOS.Keyring())
+except Exception:
+    pass
 
 SCOPES = [
     'https://www.googleapis.com/auth/drive.appdata',
@@ -40,11 +52,11 @@ class NotConfigured(Exception):
 
 
 def _client_id():
-    return os.environ.get('FREEFLO_GOOGLE_CLIENT_ID', '')
+    return config.get_google_client()[0]
 
 
 def _client_secret():
-    return os.environ.get('FREEFLO_GOOGLE_CLIENT_SECRET', '')
+    return config.get_google_client()[1]
 
 
 def is_configured():
@@ -72,7 +84,9 @@ def connect():
         }
     }
     flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
-    creds = flow.run_local_server(port=0, open_browser=True)
+    # timeout_seconds bounds the wait: if the user abandons the browser tab the
+    # local server stops instead of leaving the thread and socket alive forever.
+    creds = flow.run_local_server(port=0, open_browser=True, timeout_seconds=300)
     keyring.set_password(_KEYRING_SERVICE, _KEYRING_ACCOUNT, creds.refresh_token)
     return _fetch_email(creds)
 

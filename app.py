@@ -380,11 +380,16 @@ class FreefloApp(rumps.App):
         self._maybe_sync_backup(manual=True)
 
     def _disconnect_google(self, delete_remote):
-        try:
-            if delete_remote:
+        if delete_remote:
+            try:
                 backup.delete_remote()
-        except Exception as e:
-            self._send_backup_status({'error': f'Could not delete Drive backup: {e}'})
+            except Exception as e:
+                # Stay connected so the user can retry — disconnecting now would
+                # orphan a Drive backup they believe was just deleted.
+                self._send_backup_status(
+                    {'error': f'Could not delete Drive backup: {e}. Still connected — try again.'}
+                )
+                return
         gauth.disconnect()
         settings = cfg.load()
         settings['backup_enabled'] = False

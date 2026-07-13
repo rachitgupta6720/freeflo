@@ -66,6 +66,35 @@ def get_whisper_cli():
     return os.path.expanduser('~/whisper.cpp/build-static/bin/whisper-cli')
 
 
+def get_google_client():
+    """OAuth client credentials for the optional Google Drive backup.
+
+    Resolved in order:
+      1. Environment variables (developer / run-from-source).
+      2. A bundled `google_client.json` — in the app's Resources when frozen
+         (shipped via setup.py DATA_FILES), else next to this file from source.
+
+    Returns ``(client_id, client_secret)``; either may be '' when unconfigured,
+    in which case the Backup tab shows "not available in this build".
+
+    Note: a "Desktop app" OAuth client secret is not truly confidential —
+    installed apps cannot keep one, and the loopback flow uses PKCE — so
+    shipping it inside the bundle is expected and safe.
+    """
+    cid = os.environ.get('FREEFLO_GOOGLE_CLIENT_ID', '')
+    secret = os.environ.get('FREEFLO_GOOGLE_CLIENT_SECRET', '')
+    if cid and secret:
+        return cid, secret
+    r = _resources_dir()
+    base = r if r else os.path.dirname(os.path.abspath(__file__))
+    try:
+        with open(os.path.join(base, 'google_client.json')) as f:
+            data = json.load(f)
+        return data.get('client_id', ''), data.get('client_secret', '')
+    except (OSError, ValueError):
+        return '', ''
+
+
 def get_ui_dir():
     """Directory holding the window's HTML assets. When frozen they live in
     Contents/Resources/ui (shipped via setup.py DATA_FILES); from source they
