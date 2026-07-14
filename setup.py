@@ -32,8 +32,8 @@ OPTIONS = {
         'CFBundleName': 'freeflo',
         'CFBundleDisplayName': 'freeflo',
         'CFBundleIdentifier': 'com.freeflo.app',
-        'CFBundleVersion': '1.0.0',
-        'CFBundleShortVersionString': '1.0.0',
+        'CFBundleVersion': '1.1.0',
+        'CFBundleShortVersionString': '1.1.0',
         'NSMicrophoneUsageDescription': (
             'freeflo uses the microphone to transcribe your speech.'
         ),
