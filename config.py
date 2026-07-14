@@ -14,6 +14,9 @@ _DEFAULTS = {
     'ptt_key': 'left_option',    # push-to-talk (hold) key
     'toggle_key': 'right_option',  # toggle (tap on/off) key
     'save_history': True,        # log transcriptions to the local history DB
+    'backup_enabled': False,      # sync history to the user's Google Drive
+    'backup_account_email': None,  # cached, so the UI can show it without a network call
+    'backup_last_synced': None,   # epoch seconds of the last successful sync
 }
 
 # Selectable hotkey keys. Each carries the virtual keycode of the physical key
@@ -61,6 +64,35 @@ def get_whisper_cli():
     if r:
         return os.path.join(r, 'whisper-cli')
     return os.path.expanduser('~/whisper.cpp/build-static/bin/whisper-cli')
+
+
+def get_google_client():
+    """OAuth client credentials for the optional Google Drive backup.
+
+    Resolved in order:
+      1. Environment variables (developer / run-from-source).
+      2. A bundled `google_client.json` — in the app's Resources when frozen
+         (shipped via setup.py DATA_FILES), else next to this file from source.
+
+    Returns ``(client_id, client_secret)``; either may be '' when unconfigured,
+    in which case the Backup tab shows "not available in this build".
+
+    Note: a "Desktop app" OAuth client secret is not truly confidential —
+    installed apps cannot keep one, and the loopback flow uses PKCE — so
+    shipping it inside the bundle is expected and safe.
+    """
+    cid = os.environ.get('FREEFLO_GOOGLE_CLIENT_ID', '')
+    secret = os.environ.get('FREEFLO_GOOGLE_CLIENT_SECRET', '')
+    if cid and secret:
+        return cid, secret
+    r = _resources_dir()
+    base = r if r else os.path.dirname(os.path.abspath(__file__))
+    try:
+        with open(os.path.join(base, 'google_client.json')) as f:
+            data = json.load(f)
+        return data.get('client_id', ''), data.get('client_secret', '')
+    except (OSError, ValueError):
+        return '', ''
 
 
 def get_ui_dir():

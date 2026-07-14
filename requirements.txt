@@ -7,6 +7,17 @@ numpy>=2.0                          # audio buffer handling
 scipy>=1.13                         # WAV file writing
 pyperclip>=1.9                      # clipboard-based text injection
 
+# Optional Google Drive backup (engine/gauth.py, engine/backup.py)
+google-auth>=2.35.0
+google-auth-oauthlib>=1.2.0         # OAuth loopback (RFC 8252) sign-in flow
+requests>=2.32.0                    # plain REST calls to the Drive API
+keyring>=25.0.0                     # refresh token storage in the macOS Keychain
+# google.auth.crypt imports these, but recent google-auth no longer pins
+# cachetools/rsa, so declare them explicitly to keep clean installs working.
+cryptography>=42.0
+cachetools>=5.0
+rsa>=4.9
+
 # PyObjC bridges (pull in pyobjc-core automatically)
 pyobjc-framework-Cocoa>=10.0
 pyobjc-framework-Quartz>=10.0       # CGEventTap hotkey listener

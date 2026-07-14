@@ -18,6 +18,10 @@ _Changes landing here will roll into the next release. The app binary is
 unchanged since 1.0.0; the entries below are website/repository changes._
 
 ### Added
+- Optional Google Drive backup of dictation history (off by default): syncs to
+  a hidden, app-private folder in the user's own Drive so history survives a
+  reinstall and follows them to another Mac. On-device dictation is unchanged
+  and audio is never uploaded.
 - Product landing page (`docs/`), served via GitHub Pages, with a live typing
   demo, "how it works", features, a privacy section, and a comparison vs Wispr Flow.
 - "Free forever" messaging and a `$0` vs paid-alternative price comparison.
