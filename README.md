@@ -22,6 +22,26 @@ freeflo lives in your menu bar (🎙) and stays out of the way until you need it
   dictation history syncs to a hidden folder in *your own* Google Drive, so
   it survives a reinstall and follows you to another Mac. See below.
 
+## Install (for users)
+
+The fastest way to get freeflo — one command in Terminal, nothing else to set up:
+
+```bash
+curl -fsSL https://rachitgupta6720.github.io/freeflo/install.sh | bash
+```
+
+This downloads the latest release, installs it to your Applications folder, clears
+the macOS quarantine flag (so you never see the "app is damaged" warning), and
+launches it. On first run, grant **Microphone** and **Accessibility** when macOS
+asks. That's it — no Apple ID, no App Store, no build steps.
+
+> Why a command instead of a double-click? freeflo isn't notarized by Apple (that
+> needs a paid Apple Developer account), so a browser-downloaded build gets
+> flagged as "damaged." The installer simply clears that flag for you.
+
+The sections below are for **developers** who want to run or package freeflo from
+source.
+
 ## Requirements
 
 - macOS (Apple Silicon or Intel)

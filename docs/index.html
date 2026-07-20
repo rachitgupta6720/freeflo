@@ -129,6 +129,16 @@
   .stuck{margin-top:16px;font-size:.9rem;color:var(--muted)}
   .stuck code{font-family:var(--mono);font-size:.88em;background:#fff;border:1px solid var(--line);
     border-radius:6px;padding:2px 7px;color:var(--text)}
+  .cmd{display:flex;align-items:center;gap:10px;margin:12px 0 10px;background:var(--ink);
+    border-radius:10px;padding:12px 12px 12px 16px;overflow-x:auto}
+  .cmd code{font-family:var(--mono);font-size:.86rem;color:#EAF2F1;background:none;border:none;
+    padding:0;white-space:nowrap}
+  .cmd .copy{flex:none;margin-left:auto;font-family:var(--mono);font-size:.78rem;cursor:pointer;
+    color:#0B1220;background:var(--teal);border:none;border-radius:7px;padding:7px 12px;font-weight:600}
+  .cmd .copy:hover{filter:brightness(1.08)}
+  .muted{color:var(--muted);font-size:.9rem}
+  kbd{font-family:var(--mono);font-size:.82em;background:#fff;border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--text)}
 
   /* footer */
   footer{background:var(--ink);color:var(--muted-dark);padding:56px 0 64px;font-size:.92rem}
@@ -378,35 +388,25 @@
       <div class="istep">
         <div class="num">1</div>
         <div>
-          <h3>Download and unzip</h3>
-          <p>Click <b>Download freeflo</b> above. When it finishes, double-click <code>freeflo.zip</code> in your Downloads to unzip it — you'll get <b>freeflo</b>.</p>
+          <h3>Install with one command</h3>
+          <p>Open <b>Terminal</b> (press <kbd>⌘ Space</kbd>, type “Terminal”, hit Return), then paste this line and press Return:</p>
+          <div class="cmd">
+            <code id="installcmd">curl -fsSL https://rachitgupta6720.github.io/freeflo/install.sh | bash</code>
+            <button class="copy" type="button" onclick="navigator.clipboard.writeText(document.getElementById('installcmd').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
+          </div>
+          <p class="muted">This downloads freeflo, installs it to your Applications folder, and opens it automatically — no “app is damaged” warning, no dragging, no extra clicks.</p>
         </div>
       </div>
       <div class="istep">
         <div class="num">2</div>
         <div>
-          <h3>Move it to Applications</h3>
-          <p>Drag <b>freeflo</b> into your <span class="path">Applications</span> folder. That's where Mac apps live.</p>
-        </div>
-      </div>
-      <div class="istep">
-        <div class="num">3</div>
-        <div>
-          <h3>Open it the first time</h3>
-          <p>Because freeflo is from an independent developer (not the App Store), macOS checks with you first. Double-click it — if you see <b>“Apple could not verify…”</b>, click <b>Done</b>.</p>
-          <p>Then open <span class="path">System Settings → Privacy &amp; Security</span>, scroll down, and click <b>Open Anyway</b> next to freeflo. Confirm with <b>Open</b>. You only do this once.</p>
-        </div>
-      </div>
-      <div class="istep">
-        <div class="num">4</div>
-        <div>
           <h3>Allow the microphone &amp; keyboard</h3>
-          <p>freeflo needs two permissions: the <b>Microphone</b> (to hear you) and <b>Accessibility</b> (to type into other apps and use the hotkey). macOS will prompt you — say yes.</p>
+          <p>On first launch freeflo needs two permissions: the <b>Microphone</b> (to hear you) and <b>Accessibility</b> (to type into other apps and use the hotkey). macOS will prompt you — say yes.</p>
           <p>If the hotkey doesn't work, go to <span class="path">System Settings → Privacy &amp; Security → Accessibility</span>, switch <b>freeflo</b> on, and relaunch it.</p>
         </div>
       </div>
       <div class="istep">
-        <div class="num">5</div>
+        <div class="num">3</div>
         <div>
           <h3>Look up — you're ready</h3>
           <p>Find the <b>🎙</b> icon in your menu bar. Put your cursor anywhere, <b>hold Left Option (⌥)</b>, say a sentence, and let go. Welcome to hands-free typing.</p>
@@ -416,10 +416,10 @@
 
     <div class="callout">
       <span style="font-size:1.2rem;line-height:1">📦</span>
-      <div><b>Why 644 MB?</b> The download bundles the complete speech-recognition models right inside the app, so freeflo works fully offline the moment you open it — no extra setup, no downloads, no sign-in.</div>
+      <div><b>Why ~650 MB?</b> freeflo bundles the complete speech-recognition models right inside the app, so it works fully offline the moment you open it — no extra setup, no downloads, no sign-in.</div>
     </div>
 
-    <p class="stuck">Still blocked after step 3? Open <b>Terminal</b> and run <code>xattr -dr com.apple.quarantine /Applications/freeflo.app</code>, then try again. Prefer to build from source instead? See the <a href="https://github.com/rachitgupta6720/freeflo#readme" style="color:var(--teal)">README on GitHub</a>.</p>
+    <p class="stuck">Prefer to do it by hand? Use the <b>Download freeflo</b> button above, unzip, drag it to Applications, then run <code>xattr -dr com.apple.quarantine /Applications/freeflo.app</code> in Terminal so macOS doesn't flag it. Building from source? See the <a href="https://github.com/rachitgupta6720/freeflo#readme" style="color:var(--teal)">README on GitHub</a>.</p>
   </div>
 </section>
 
