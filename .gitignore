@@ -21,6 +21,9 @@ whisper-cli
 # Google OAuth client baked into the build (holds the client secret) — never commit
 google_client.json
 
+# Telemetry keys (PostHog project key + Sentry DSN) baked into the build — never commit
+telemetry.json
+
 # macOS
 .DS_Store
 

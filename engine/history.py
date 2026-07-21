@@ -106,6 +106,31 @@ def list_entries(query=None, limit=300):
     ]
 
 
+def stats():
+    """Lightweight counts for the Home dashboard: entries today (since local
+    midnight), total entries, and words dictated in the last 7 days."""
+    conn = _connect()
+    try:
+        now = time.time()
+        lt = time.localtime(now)
+        midnight = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
+        total = conn.execute(
+            "SELECT COUNT(*) FROM history WHERE deleted_at IS NULL"
+        ).fetchone()[0]
+        today = conn.execute(
+            "SELECT COUNT(*) FROM history WHERE deleted_at IS NULL AND ts >= ?",
+            (midnight,),
+        ).fetchone()[0]
+        week_rows = conn.execute(
+            "SELECT text FROM history WHERE deleted_at IS NULL AND ts >= ?",
+            (now - 7 * 86400,),
+        ).fetchall()
+        words_week = sum(len((r[0] or '').split()) for r in week_rows)
+    finally:
+        conn.close()
+    return {'total': total, 'today': today, 'words_week': words_week}
+
+
 def clear():
     """Soft-delete every entry, so the deletion can sync to other devices as a
     tombstone instead of a hard DELETE a later merge would resurrect."""

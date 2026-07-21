@@ -1,6 +1,8 @@
 import os
 import sys
+import re
 import json
+import plistlib
 
 _APP_SUPPORT = os.path.expanduser('~/Library/Application Support')
 _CONFIG_DIR = os.path.join(_APP_SUPPORT, 'freeflo')
@@ -17,6 +19,21 @@ _DEFAULTS = {
     'backup_enabled': False,      # sync history to the user's Google Drive
     'backup_account_email': None,  # cached, so the UI can show it without a network call
     'backup_last_synced': None,   # epoch seconds of the last successful sync
+
+    # --- onboarding + consent + identity (Phase 1) ---
+    'onboarded': False,          # has the first-run flow completed?
+    'install_id': None,          # random anonymous id (generated once, see get_or_create_install_id)
+    'consent_version': 0,        # bumps when the consent copy materially changes
+    'analytics_enabled': True,   # opt-in usage analytics (default on, transparent, editable)
+    'crash_enabled': True,       # opt-in crash reporting
+    # Identity captured at onboarding (all optional — the sign-in step is skippable).
+    'profile_name': None,
+    'profile_email': None,
+    'profile_role': None,        # what they work in
+    'profile_goal': None,        # what they want to achieve with freeflo
+    # --- appearance (Phase 4 uses these; stored here so onboarding can set them) ---
+    'theme': 'system',           # 'system' | 'light' | 'dark' | 'glass'
+    'glass': False,              # glassmorphism vibrancy on top of the base theme
 }
 
 # Selectable hotkey keys. Each carries the virtual keycode of the physical key
@@ -95,6 +112,33 @@ def get_google_client():
         return '', ''
 
 
+def get_telemetry_config():
+    """Keys for opt-in telemetry (PostHog + Sentry). Resolved from environment
+    variables first (dev), else a bundled ``telemetry.json`` (in Resources when
+    frozen, else next to this file). All empty when unconfigured, which makes
+    engine.telemetry a complete no-op. These are client-side/public keys
+    (PostHog project key, Sentry DSN), safe to ship in the bundle."""
+    cfg = {
+        'posthog_key': os.environ.get('FREEFLO_POSTHOG_KEY', ''),
+        'posthog_host': os.environ.get('FREEFLO_POSTHOG_HOST', ''),
+        'sentry_dsn': os.environ.get('FREEFLO_SENTRY_DSN', ''),
+    }
+    if cfg['posthog_key'] or cfg['sentry_dsn']:
+        return cfg
+    r = _resources_dir()
+    base = r if r else os.path.dirname(os.path.abspath(__file__))
+    try:
+        with open(os.path.join(base, 'telemetry.json')) as f:
+            data = json.load(f)
+        return {
+            'posthog_key': data.get('posthog_key', ''),
+            'posthog_host': data.get('posthog_host', ''),
+            'sentry_dsn': data.get('sentry_dsn', ''),
+        }
+    except (OSError, ValueError):
+        return cfg
+
+
 def get_ui_dir():
     """Directory holding the window's HTML assets. When frozen they live in
     Contents/Resources/ui (shipped via setup.py DATA_FILES); from source they
@@ -103,6 +147,32 @@ def get_ui_dir():
     if r:
         return os.path.join(r, 'ui')
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ui')
+
+
+def get_version():
+    """The app's version string. Single source of truth is setup.py's
+    CFBundleShortVersionString; when frozen we read the authoritative value
+    from the bundle's Info.plist instead. Falls back to '0.0.0'."""
+    r = _resources_dir()
+    if r:
+        try:
+            # r = .../Contents/Resources ; Info.plist = .../Contents/Info.plist
+            plist_path = os.path.join(os.path.dirname(r), 'Info.plist')
+            with open(plist_path, 'rb') as f:
+                v = plistlib.load(f).get('CFBundleShortVersionString')
+            if v:
+                return v
+        except Exception:
+            pass
+    try:
+        setup_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'setup.py')
+        with open(setup_py) as f:
+            m = re.search(r"CFBundleShortVersionString'\s*:\s*'([^']+)'", f.read())
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return '0.0.0'
 
 
 def get_model_path(language='en'):
@@ -133,3 +203,16 @@ def save(data):
     os.makedirs(_CONFIG_DIR, exist_ok=True)
     with open(_CONFIG_FILE, 'w') as f:
         json.dump(data, f, indent=2)
+
+
+def get_or_create_install_id():
+    """A stable, anonymous per-install id. Generated once and persisted, so
+    analytics can count installs/retention without any personal data."""
+    import uuid
+    settings = load()
+    iid = settings.get('install_id')
+    if not iid:
+        iid = str(uuid.uuid4())
+        settings['install_id'] = iid
+        save(settings)
+    return iid

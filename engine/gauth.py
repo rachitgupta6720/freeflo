@@ -37,6 +37,9 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.appdata',
     'openid',
     'https://www.googleapis.com/auth/userinfo.email',
+    # profile → the signed-in user's display name, captured at onboarding for
+    # identity. No extra access to Drive/content; just who they are.
+    'https://www.googleapis.com/auth/userinfo.profile',
 ]
 
 _KEYRING_SERVICE = 'freeflo-google-backup'
@@ -68,9 +71,15 @@ def is_connected():
 
 
 def connect():
-    """Run the sign-in flow. Blocks the calling thread until the browser
-    redirect lands (or the user closes the tab / it times out). Returns the
-    signed-in account's email on success."""
+    """Run the sign-in flow. Returns the signed-in account's email (used by the
+    backup feature, whose callers expect a plain email string)."""
+    return connect_full().get('email', '')
+
+
+def connect_full():
+    """Run the sign-in flow and return the account identity as a dict
+    ``{email, name, picture}``. Blocks the calling thread until the browser
+    redirect lands (or the user closes the tab / it times out)."""
     if not is_configured():
         raise NotConfigured(
             'This build of freeflo has no Google Backup credentials configured.'
@@ -88,7 +97,19 @@ def connect():
     # local server stops instead of leaving the thread and socket alive forever.
     creds = flow.run_local_server(port=0, open_browser=True, timeout_seconds=300)
     keyring.set_password(_KEYRING_SERVICE, _KEYRING_ACCOUNT, creds.refresh_token)
-    return _fetch_email(creds)
+    return _fetch_userinfo(creds)
+
+
+def get_identity():
+    """Best-effort {email, name, picture} for the already-connected account, or
+    None. Used to rehydrate the profile without a fresh sign-in."""
+    creds = get_credentials()
+    if creds is None:
+        return None
+    try:
+        return _fetch_userinfo(creds)
+    except Exception:
+        return None
 
 
 def disconnect():
@@ -119,11 +140,16 @@ def get_credentials():
     return creds
 
 
-def _fetch_email(creds):
+def _fetch_userinfo(creds):
     resp = requests.get(
         _USERINFO_URI,
         headers={'Authorization': f'Bearer {creds.token}'},
         timeout=10,
     )
     resp.raise_for_status()
-    return resp.json().get('email', '')
+    data = resp.json()
+    return {
+        'email': data.get('email', ''),
+        'name': data.get('name', ''),
+        'picture': data.get('picture', ''),
+    }

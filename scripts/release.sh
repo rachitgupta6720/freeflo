@@ -84,6 +84,39 @@ rm -rf build dist
 "$PY" setup.py py2app >/dev/null
 [ -d dist/freeflo.app ] || die "Build did not produce dist/freeflo.app."
 
+# --- 4b. codesign + notarize + staple (STAGED — off until a Developer ID exists) ---
+# Flip on by exporting FREEFLO_NOTARIZE=1 along with:
+#   FREEFLO_SIGN_IDENTITY  = "Developer ID Application: Your Name (TEAMID)"
+#   FREEFLO_NOTARY_PROFILE = a keychain profile saved via:
+#       xcrun notarytool store-credentials FREEFLO_NOTARY_PROFILE \
+#         --apple-id you@example.com --team-id TEAMID --password <app-specific-pw>
+# Until then the app ships unsigned (Gatekeeper shows the "damaged" warning).
+if [ "${FREEFLO_NOTARIZE:-0}" = "1" ]; then
+    : "${FREEFLO_SIGN_IDENTITY:?set FREEFLO_SIGN_IDENTITY to notarize}"
+    : "${FREEFLO_NOTARY_PROFILE:?set FREEFLO_NOTARY_PROFILE to notarize}"
+    ENT="$ROOT/scripts/entitlements.plist"
+
+    step "Codesigning freeflo.app (hardened runtime)"
+    # Sign nested code (dylibs, the whisper-cli binary, frameworks) inside-out,
+    # then the app itself. --deep is deprecated but reliable for py2app bundles.
+    codesign --force --deep --options runtime --timestamp \
+        --entitlements "$ENT" --sign "$FREEFLO_SIGN_IDENTITY" dist/freeflo.app
+    codesign --verify --strict --verbose=2 dist/freeflo.app
+
+    step "Notarizing (submitting to Apple, waits for the verdict)"
+    ( cd dist && ditto -c -k --sequesterRsrc --keepParent freeflo.app notarize.zip )
+    xcrun notarytool submit dist/notarize.zip \
+        --keychain-profile "$FREEFLO_NOTARY_PROFILE" --wait
+    rm -f dist/notarize.zip
+
+    step "Stapling the notarization ticket"
+    xcrun stapler staple dist/freeflo.app
+    xcrun stapler validate dist/freeflo.app
+    echo "  signed + notarized + stapled"
+else
+    echo "  (unsigned build — set FREEFLO_NOTARIZE=1 to codesign + notarize)"
+fi
+
 step "Packaging freeflo.zip"
 ( cd dist && ditto -c -k --sequesterRsrc --keepParent freeflo.app freeflo.zip )
 BYTES="$(stat -f%z dist/freeflo.zip)"

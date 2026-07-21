@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>freeflo · app window</title>
+<style>
+  /* ============================================================
+     freeflo — main window  ·  design prototype
+     Neutral, technology-first. Themes: System / Light / Dark / Glass.
+     Glass = translucent frosted surfaces (backdrop-filter) over an
+     ambient neutral backdrop; in the real app it pairs with a native
+     NSVisualEffectView for true macOS vibrancy.
+     ============================================================ */
+
+  /* ---- DARK (default) ---- */
+  :root {
+    --bg:#08080a; --bg-2:#0c0c0f;
+    --surface:#111116; --surface-2:#17171c; --surface-3:#1e1e24;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12); --line-3:rgba(255,255,255,.20);
+    --text:#f5f5f6; --muted:#a0a0a8; --faint:#6b6b74;
+    --hi:#ffffff; --ink:#0a0a0c; --glow:rgba(255,255,255,.18);
+    --wm:linear-gradient(180deg,#fff 0%,#d4d4da 46%,#f6f6f8 56%,#9a9aa3 100%);
+    --blur:none; --veil:.90; --grid:.5;
+    --shadow:0 10px 40px rgba(0,0,0,.5);
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+    --sans:-apple-system,"SF Pro Display",system-ui,sans-serif;
+    --r:14px; --r-sm:9px;
+    color-scheme:dark;
+  }
+  [data-theme="light"] {
+    --bg:#f5f5f6; --bg-2:#ececee;
+    --surface:#ffffff; --surface-2:#f6f6f7; --surface-3:#ececee;
+    --line:rgba(0,0,0,.08); --line-2:rgba(0,0,0,.13); --line-3:rgba(0,0,0,.22);
+    --text:#18181b; --muted:#52525b; --faint:#8a8a92;
+    --hi:#111114; --ink:#ffffff; --glow:rgba(0,0,0,.14);
+    --wm:linear-gradient(180deg,#2a2a30 0%,#3f3f47 46%,#232329 56%,#5c5c66 100%);
+    --blur:none; --veil:.92; --grid:.35;
+    --shadow:0 10px 40px rgba(0,0,0,.12);
+    color-scheme:light;
+  }
+  [data-theme="glass"] {
+    --bg:#0b0b10; --bg-2:#0c0c12;
+    --surface:rgba(255,255,255,.055); --surface-2:rgba(255,255,255,.09); --surface-3:rgba(255,255,255,.13);
+    --line:rgba(255,255,255,.14); --line-2:rgba(255,255,255,.20); --line-3:rgba(255,255,255,.30);
+    --text:#f6f6f8; --muted:#cfcfd6; --faint:#9a9aa4;
+    --hi:#ffffff; --ink:#0a0a0c; --glow:rgba(255,255,255,.28);
+    --wm:linear-gradient(180deg,#fff 0%,#dcdce2 46%,#fff 56%,#a6a6b0 100%);
+    --blur:saturate(170%) blur(26px); --veil:.26; --grid:.35;
+    --shadow:0 16px 50px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    font:14px/1.5 var(--sans); color:var(--text);
+    -webkit-user-select:none; user-select:none; overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ambient backdrop (the "desktop" glass blurs) + theme veil + grid */
+  body::before{ content:""; position:fixed; inset:0; z-index:-3;
+    background:
+      radial-gradient(760px 560px at 14% 18%, rgba(150,160,185,.30), transparent 60%),
+      radial-gradient(620px 520px at 86% 12%, rgba(196,186,208,.22), transparent 60%),
+      radial-gradient(760px 620px at 72% 96%, rgba(140,152,170,.26), transparent 60%),
+      #0b0b10;
+  }
+  body::after{ content:""; position:fixed; inset:0; z-index:-2;
+    background:var(--bg); opacity:var(--veil); transition:opacity .35s ease; }
+  .grid{ position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:var(--grid);
+    background-image:
+      linear-gradient(to right, var(--line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(1200px 800px at 50% 0%, #000 40%, transparent 85%);
+            mask-image:radial-gradient(1200px 800px at 50% 0%, #000 40%, transparent 85%); }
+
+  .app{ display:flex; height:100%; }
+
+  /* ---------- sidebar ---------- */
+  .side{
+    width:224px; flex:none; display:flex; flex-direction:column;
+    padding:20px 14px; gap:4px; border-right:1px solid var(--line);
+    background:var(--surface); backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur);
+  }
+  .brand{ display:flex; align-items:center; gap:11px; padding:6px 8px 18px; }
+  .chip{ width:34px; height:34px; border-radius:10px; flex:none; position:relative; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; gap:2.6px;
+    background:linear-gradient(155deg,#2a2a33,#0a0a0e); border:1px solid rgba(255,255,255,.14);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 4px 16px rgba(0,0,0,.5), 0 0 20px rgba(255,255,255,.05); }
+  .chip::after{ content:""; position:absolute; inset:0;
+    background:linear-gradient(180deg,rgba(255,255,255,.14),transparent 42%); }
+  .chip i{ width:2.6px; border-radius:3px; transform-origin:center;
+    background:linear-gradient(180deg,#fff,#c6c6cd); box-shadow:0 0 7px var(--glow);
+    animation:eq 1.5s ease-in-out infinite; }
+  .chip i:nth-child(1){height:8px;animation-delay:0s}
+  .chip i:nth-child(2){height:17px;animation-delay:.22s}
+  .chip i:nth-child(3){height:11px;animation-delay:.1s}
+  .chip i:nth-child(4){height:6px;animation-delay:.34s}
+  @keyframes eq{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+  .wordmark{ font:800 16px/1 var(--sans); text-transform:uppercase; letter-spacing:.15em;
+    background:var(--wm); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+  .nav-label{ font:10px/1 var(--mono); letter-spacing:1.6px; text-transform:uppercase;
+    color:var(--faint); padding:10px 10px 6px; }
+  .nav{ display:flex; flex-direction:column; gap:2px; }
+  .nav a{ display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:10px;
+    color:var(--muted); cursor:pointer; font-size:13.5px; font-weight:520; position:relative; }
+  .nav a svg{ width:17px; height:17px; opacity:.85; }
+  .nav a:hover{ color:var(--text); background:var(--surface-2); }
+  .nav a.active{ color:var(--text); background:var(--surface-3); }
+  .nav a.active::before{ content:""; position:absolute; left:-14px; top:9px; bottom:9px; width:3px;
+    border-radius:3px; background:var(--hi); box-shadow:0 0 10px var(--glow); }
+  .nav a .kb{ margin-left:auto; font:10px/1 var(--mono); color:var(--faint); }
+  .nav a.accent{ color:var(--text); border:1px dashed var(--line-2); margin-top:6px; }
+
+  .side-foot{ margin-top:auto; padding-top:14px; }
+  .theme{ display:flex; gap:3px; padding:3px; border:1px solid var(--line); border-radius:11px;
+    background:var(--bg-2); }
+  .theme button{ flex:1; border:none; background:transparent; color:var(--faint); cursor:pointer;
+    padding:7px 0; border-radius:8px; font-size:11px; font-weight:600; display:grid; place-items:center; gap:2px; }
+  .theme button svg{ width:15px; height:15px; }
+  .theme button.on{ background:var(--surface-3); color:var(--text); }
+  .theme .lbl{ font-size:9px; letter-spacing:.3px; }
+
+  /* ---------- main ---------- */
+  .main{ flex:1; overflow:auto; padding:26px 30px 40px; }
+  .view{ display:none; animation:rise .4s cubic-bezier(.2,.7,.2,1); }
+  .view.on{ display:block; }
+  @keyframes rise{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+
+  .head{ display:flex; align-items:flex-end; gap:14px; margin-bottom:22px; }
+  .head h1{ font-size:23px; font-weight:660; letter-spacing:-.4px; margin:0; }
+  .head p{ margin:2px 0 0; color:var(--muted); font-size:13px; }
+  .head .right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+  .pill{ font:11px/1 var(--mono); letter-spacing:.5px; padding:7px 12px; border-radius:999px;
+    border:1px solid var(--line-2); color:var(--muted); background:var(--surface); }
+  .pill.live{ color:var(--text); }
+  .pill.live .dot{ display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px;
+    background:var(--hi); box-shadow:0 0 9px var(--glow); vertical-align:middle; animation:breathe 1.6s infinite; }
+  @keyframes breathe{ 0%,100%{opacity:.5} 50%{opacity:1} }
+
+  .card{ position:relative; background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--r); box-shadow:var(--shadow);
+    backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur); }
+  .hud::before,.hud::after{ content:""; position:absolute; width:9px; height:9px;
+    border-color:var(--line-3); border-style:solid; pointer-events:none; }
+  .hud::before{ top:-1px; left:-1px; border-width:1px 0 0 1px; }
+  .hud::after{ bottom:-1px; right:-1px; border-width:0 1px 1px 0; }
+
+  kbd{ font:12px/1 var(--mono); color:var(--text); padding:8px 11px; border-radius:8px; min-width:38px;
+    text-align:center; display:inline-block;
+    background:linear-gradient(180deg, var(--surface-3), var(--surface-2));
+    border:1px solid var(--line-2); box-shadow:0 2px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06); }
+
+  .btn{ font:13px/1 var(--sans); font-weight:620; padding:10px 16px; border-radius:9px; cursor:pointer;
+    border:1px solid var(--line-2); background:var(--surface-3); color:var(--text); transition:all .15s; }
+  .btn:hover{ border-color:var(--line-3); } .btn:active{ transform:translateY(1px); }
+  .btn.primary{ background:var(--hi); color:var(--ink); border-color:var(--hi);
+    box-shadow:0 6px 22px var(--glow); }
+  .btn.ghost{ background:transparent; color:var(--muted); }
+  .toggle{ width:42px; height:25px; flex:none; border-radius:999px; cursor:pointer;
+    background:var(--surface-3); border:1px solid var(--line-2); position:relative; transition:.2s; }
+  .toggle::after{ content:""; position:absolute; top:2px; left:2px; width:19px; height:19px; border-radius:50%;
+    background:#8b8b93; transition:.2s cubic-bezier(.3,1.4,.5,1); }
+  .toggle.on{ background:var(--hi); border-color:var(--hi); } .toggle.on::after{ left:19px; background:var(--ink); }
+
+  /* ===== HOME ===== */
+  .home-top{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
+  .orb-card{ padding:26px; display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .orb{ position:relative; width:150px; height:150px; display:grid; place-items:center; margin:6px 0 14px; }
+  .orb .ring{ position:absolute; inset:0; border-radius:50%; border:1px solid var(--line-2); }
+  .orb .ring.r2{ inset:-18px; border-style:dashed; border-color:var(--line); animation:spin 20s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .orb .core{ width:98px; height:98px; border-radius:50%; display:grid; place-items:center; cursor:pointer;
+    background:radial-gradient(circle at 50% 36%, var(--surface-3), var(--bg) 72%);
+    border:1px solid var(--line-2); box-shadow:0 0 50px var(--glow), inset 0 2px 16px rgba(0,0,0,.5); transition:transform .1s; }
+  .orb .core:active{ transform:scale(.95); }
+  .orb .wave{ display:flex; align-items:center; gap:3.5px; height:36px; }
+  .orb .wave span{ width:3.5px; border-radius:3px; background:var(--hi); box-shadow:0 0 7px var(--glow);
+    animation:eq2 1.1s ease-in-out infinite; }
+  .orb.rec .wave span{ animation-duration:.5s; }
+  .orb .wave span:nth-child(1){animation-delay:0s}.orb .wave span:nth-child(2){animation-delay:.15s}
+  .orb .wave span:nth-child(3){animation-delay:.3s}.orb .wave span:nth-child(4){animation-delay:.1s}
+  .orb .wave span:nth-child(5){animation-delay:.4s}
+  @keyframes eq2{0%,100%{height:8px;opacity:.5}50%{height:34px;opacity:1}}
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .stat{ padding:15px 16px; }
+  .stat .k{ font:10px/1 var(--mono); letter-spacing:1px; text-transform:uppercase; color:var(--faint); }
+  .stat .v{ font-size:24px; font-weight:700; margin-top:8px; letter-spacing:-.5px; }
+  .stat .d{ font-size:11px; color:var(--muted); margin-top:3px; }
+  .section-t{ font:10px/1 var(--mono); letter-spacing:1.6px; text-transform:uppercase; color:var(--faint);
+    margin:26px 0 12px; display:flex; align-items:center; gap:10px; }
+  .section-t::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .recent{ display:flex; flex-direction:column; }
+  .recent .row{ display:flex; align-items:center; gap:12px; padding:13px 16px; border-bottom:1px solid var(--line); }
+  .recent .row:last-child{ border-bottom:none; }
+  .recent .t{ font:11px/1 var(--mono); color:var(--faint); width:52px; flex:none; }
+  .recent .x{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .badge{ font:10px/1 var(--mono); color:var(--muted); border:1px solid var(--line-2); border-radius:999px;
+    padding:4px 9px; background:var(--bg-2); }
+
+  /* ===== HISTORY ===== */
+  .h-top{ display:flex; gap:10px; align-items:center; margin-bottom:16px; }
+  .search{ flex:1; position:relative; }
+  .search input{ width:100%; padding:11px 12px 11px 36px; font-size:13.5px; color:var(--text);
+    background:var(--surface); border:1px solid var(--line-2); border-radius:10px; outline:none;
+    backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur); }
+  .search svg{ position:absolute; left:12px; top:11px; width:16px; height:16px; color:var(--faint); }
+  .switch{ display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12.5px; white-space:nowrap; }
+  .entry{ padding:13px 15px; margin-bottom:9px; }
+  .entry .meta{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .entry .meta .t{ font:11px/1 var(--mono); color:var(--faint); }
+  .entry .meta .copy{ margin-left:auto; background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; }
+  .entry .x{ font-size:14px; line-height:1.55; }
+
+  /* ===== SHORTCUTS ===== */
+  .field{ padding:18px 20px; margin-bottom:12px; }
+  .field .lab{ display:flex; align-items:center; gap:8px; font-weight:620; margin-bottom:5px; }
+  .field .tag{ font:10px/1 var(--mono); color:var(--faint); border:1px solid var(--line-2);
+    padding:3px 7px; border-radius:999px; text-transform:uppercase; letter-spacing:.5px; }
+  .field .desc{ color:var(--muted); font-size:12.5px; margin:0 0 12px; }
+  .picker{ display:flex; gap:8px; flex-wrap:wrap; }
+  .picker .opt{ padding:9px 13px; border-radius:9px; border:1px solid var(--line-2); background:var(--bg-2);
+    color:var(--muted); cursor:pointer; font:12px/1 var(--mono); }
+  .picker .opt.sel{ color:var(--text); border-color:var(--line-3); background:var(--surface-3);
+    box-shadow:0 0 0 1px var(--line-3); }
+  .lang-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+
+  /* ===== BACKUP ===== */
+  .b-row{ display:flex; align-items:center; gap:14px; padding:18px 20px; }
+  .b-row .ico{ width:42px; height:42px; flex:none; border-radius:11px; display:grid; place-items:center;
+    border:1px solid var(--line-2); background:var(--surface-2); color:var(--muted); }
+  .b-row .ico svg{ width:21px; height:21px; }
+  .b-row .txt{ flex:1; } .b-row .txt h3{ margin:0 0 3px; font-size:14.5px; } .b-row .txt p{ margin:0; color:var(--muted); font-size:12.5px; }
+  .badge-ok{ font:11px/1 var(--mono); color:var(--ink); background:var(--hi); border-radius:999px; padding:5px 11px; letter-spacing:.5px; }
+  .shield{ display:flex; gap:12px; align-items:flex-start; padding:15px 18px; margin-top:12px;
+    background:linear-gradient(180deg, rgba(127,127,140,.06), transparent); }
+
+  /* ===== REQUEST (agent) ===== */
+  .req-wrap{ display:flex; flex-direction:column; height:calc(100vh - 150px); min-height:420px; }
+  .thread{ flex:1; overflow:auto; padding:6px 2px 12px; display:flex; flex-direction:column; gap:14px; }
+  .msg{ display:flex; gap:11px; max-width:78%; }
+  .msg.me{ align-self:flex-end; flex-direction:row-reverse; }
+  .msg .av{ width:30px; height:30px; flex:none; border-radius:9px; display:grid; place-items:center;
+    border:1px solid var(--line-2); background:var(--surface-2); font:11px/1 var(--mono); color:var(--muted); }
+  .msg.agent .av{ background:linear-gradient(155deg,#2a2a33,#0a0a0e); overflow:hidden; }
+  .msg .bubble{ padding:12px 15px; border-radius:14px; font-size:13.5px; line-height:1.55;
+    border:1px solid var(--line); background:var(--surface); backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur); }
+  .msg.me .bubble{ background:var(--hi); color:var(--ink); border-color:var(--hi); }
+  .msg .who{ font:10px/1 var(--mono); color:var(--faint); margin-bottom:5px; letter-spacing:.5px; }
+  .chips{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
+  .chips .c{ font-size:12px; color:var(--muted); border:1px solid var(--line-2); border-radius:999px;
+    padding:8px 13px; cursor:pointer; background:var(--surface); }
+  .chips .c:hover{ color:var(--text); border-color:var(--line-3); }
+  .composer{ display:flex; gap:10px; align-items:flex-end; padding:12px; margin-top:auto; }
+  .composer textarea{ flex:1; resize:none; height:44px; max-height:120px; padding:12px 14px; font:13.5px/1.4 var(--sans);
+    color:var(--text); background:var(--bg-2); border:1px solid var(--line-2); border-radius:11px; outline:none; }
+  .typing span{ display:inline-block; width:5px; height:5px; margin:0 1px; border-radius:50%; background:var(--faint);
+    animation:blink 1.2s infinite; } .typing span:nth-child(2){animation-delay:.2s} .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{ 0%,60%,100%{opacity:.3; transform:translateY(0)} 30%{opacity:1; transform:translateY(-3px)} }
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side">
+    <div class="brand">
+      <div class="chip"><i></i><i></i><i></i><i></i></div>
+      <div class="wordmark">freeflo</div>
+    </div>
+
+    <div class="nav-label">Workspace</div>
+    <nav class="nav" id="nav">
+      <a data-view="home" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10.5 12 3l9 7.5M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>
+        Home</a>
+      <a data-view="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        History</a>
+      <a data-view="shortcuts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5a2 2 0 1 0-2 2h10a2 2 0 1 0-2-2M9 19a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2"/></svg>
+        Shortcuts <span class="kb">⌥</span></a>
+      <a data-view="backup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 18a4 4 0 0 1-.5-7.97 5.5 5.5 0 0 1 10.6-1.6A3.75 3.75 0 0 1 17.5 18H7Z"/><path d="M12 12v5m0-5-2 2m2-2 2 2"/></svg>
+        Backup</a>
+    </nav>
+
+    <div class="nav-label">Shape freeflo</div>
+    <nav class="nav">
+      <a data-view="request" class="accent">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m12 3 1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4L12 3Z"/><path d="M19 15l.8 2 .2.8.8.2-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z"/></svg>
+        Request a feature</a>
+    </nav>
+
+    <div class="side-foot">
+      <div class="nav-label" style="padding-left:10px">Appearance</div>
+      <div class="theme" id="theme">
+        <button data-theme-set="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="lbl">System</span></button>
+        <button data-theme-set="light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">Light</span></button>
+        <button data-theme-set="dark" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12.8A8 8 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8Z"/></svg><span class="lbl">Dark</span></button>
+        <button data-theme-set="glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 3c0 5 8 5 8 12M12 3c0 4 5 5 5 10"/></svg><span class="lbl">Glass</span></button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- ---- HOME ---- -->
+    <section class="view on" id="v-home">
+      <div class="head">
+        <div><h1>Good afternoon</h1><p>freeflo is running and ready to type wherever your cursor is.</p></div>
+        <div class="right"><span class="pill live" id="homeStatus"><span class="dot"></span>Idle</span></div>
+      </div>
+      <div class="home-top">
+        <div class="card hud orb-card">
+          <div class="orb" id="orb">
+            <div class="ring"></div><div class="ring r2"></div>
+            <div class="core" id="orbCore"><div class="wave"><span></span><span></span><span></span><span></span><span></span></div></div>
+          </div>
+          <div style="font-weight:620">Tap to test — or hold <kbd style="padding:4px 8px">⌥</kbd></div>
+          <p style="color:var(--muted); font-size:12.5px; margin:8px 0 0" id="orbHint">Nothing is pasted while testing here.</p>
+        </div>
+        <div class="grid2">
+          <div class="card hud stat"><div class="k">Today</div><div class="v">37</div><div class="d">dictations</div></div>
+          <div class="card hud stat"><div class="k">Words</div><div class="v">5,912</div><div class="d">this week</div></div>
+          <div class="card hud stat"><div class="k">Streak</div><div class="v">12<span style="font-size:14px; color:var(--muted)">d</span></div><div class="d">daily use</div></div>
+          <div class="card hud stat"><div class="k">Language</div><div class="v" style="font-size:18px">English</div><div class="d">base.en · on-device</div></div>
+        </div>
+      </div>
+      <div class="section-t">Recent activity</div>
+      <div class="card recent">
+        <div class="row"><span class="t">14:22</span><span class="x">Draft a reply to Priya — I'll have the analysis ready by Thursday.</span><span class="badge">ptt</span></div>
+        <div class="row"><span class="t">14:03</span><span class="x">Summarize the meeting notes into three bullet points for the team.</span><span class="badge">toggle</span></div>
+        <div class="row"><span class="t">13:47</span><span class="x">Add a follow-up task to review the onboarding metrics next week.</span><span class="badge">ptt</span></div>
+      </div>
+    </section>
+
+    <!-- ---- HISTORY ---- -->
+    <section class="view" id="v-history">
+      <div class="head"><div><h1>History</h1><p>Every transcription, searchable and stored locally on this Mac.</p></div></div>
+      <div class="h-top">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+          <input id="hsearch" type="search" placeholder="Search history…">
+        </div>
+        <label class="switch"><span class="toggle on" data-t></span> Save history</label>
+        <button class="btn ghost">Clear</button>
+      </div>
+      <div id="hlist"></div>
+    </section>
+
+    <!-- ---- SHORTCUTS ---- -->
+    <section class="view" id="v-shortcuts">
+      <div class="head"><div><h1>Shortcuts</h1><p>Pick the keys and language. Changes apply instantly — no restart.</p></div></div>
+      <div class="card hud field">
+        <div class="lab">Push-to-talk <span class="tag">hold</span></div>
+        <p class="desc">Record only while the key is held; release to transcribe.</p>
+        <div class="picker" data-single><span class="opt sel">Left ⌥</span><span class="opt">Right ⌥</span><span class="opt">Right ⌘</span><span class="opt">Right ⌃</span></div>
+      </div>
+      <div class="card hud field">
+        <div class="lab">Toggle <span class="tag">tap</span></div>
+        <p class="desc">Tap once to start recording, tap again to stop.</p>
+        <div class="picker" data-single><span class="opt">Left ⌥</span><span class="opt sel">Right ⌥</span><span class="opt">Right ⌘</span><span class="opt">Right ⌃</span></div>
+      </div>
+      <div class="card hud field">
+        <div class="lab">Language</div>
+        <p class="desc">English uses the fast on-device model; other languages use the multilingual model.</p>
+        <div class="picker lang-grid" data-single>
+          <span class="opt sel">English</span><span class="opt">Hindi</span><span class="opt">Hinglish</span>
+          <span class="opt">Spanish</span><span class="opt">French</span><span class="opt">German</span>
+          <span class="opt">Chinese</span><span class="opt">Japanese</span><span class="opt">Auto-detect</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---- BACKUP ---- -->
+    <section class="view" id="v-backup">
+      <div class="head"><div><h1>Backup</h1><p>Your history is always saved locally. Optionally mirror it to your own Google Drive.</p></div></div>
+      <div class="card hud">
+        <div class="b-row" style="border-bottom:1px solid var(--line)">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
+          <div class="txt"><h3>Local history</h3><p>Stored in an on-device database, snapshotted continuously. Survives reinstalls.</p></div>
+          <span class="badge-ok">Always on</span>
+        </div>
+        <div class="b-row">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 18a4 4 0 0 1-.5-7.97 5.5 5.5 0 0 1 10.6-1.6A3.75 3.75 0 0 1 17.5 18H7Z"/></svg></div>
+          <div class="txt"><h3>Google Drive backup</h3><p id="bstate">Backs up after each dictation to a hidden, app-private folder — nothing else in your Drive is touched.</p></div>
+          <button class="btn primary" id="bconnect">Connect</button>
+        </div>
+      </div>
+      <div id="bconnected" style="display:none">
+        <div class="card hud" style="margin-top:12px">
+          <div class="b-row" style="border-bottom:1px solid var(--line)">
+            <div class="txt"><h3>rachit@gokiwi.in</h3><p>Last synced just now · 214 entries</p></div>
+            <span class="badge-ok">Connected</span>
+          </div>
+          <div class="b-row"><div class="txt"><h3>Back up after each dictation</h3><p>Every new transcription is mirrored within seconds.</p></div><span class="toggle on" data-t></span></div>
+          <div class="b-row" style="gap:8px"><button class="btn">Sync now</button><button class="btn ghost">Disconnect</button></div>
+        </div>
+      </div>
+      <div class="card hud shield">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" style="flex:none; margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <div><b>Only text leaves this Mac — never audio.</b><p style="margin:2px 0 0; color:var(--muted); font-size:12.5px">Backup uploads transcription text to your own Drive. Audio is deleted the instant it's transcribed.</p></div>
+      </div>
+    </section>
+
+    <!-- ---- REQUEST A FEATURE (agent) ---- -->
+    <section class="view" id="v-request">
+      <div class="head"><div><h1>Request a feature</h1><p>Tell freeflo's AI what you need. It triages every request and files it to the roadmap.</p></div>
+        <div class="right"><span class="pill"><span style="color:var(--faint)">powered by</span> flo · AI</span></div></div>
+      <div class="req-wrap">
+        <div class="thread" id="thread">
+          <div class="msg agent">
+            <div class="av"><div class="chip" style="width:30px;height:30px;border-radius:9px"><i></i><i></i><i></i><i></i></div></div>
+            <div><div class="who">flo · AI</div><div class="bubble">Hey! What would make freeflo better for you? Describe the feature, the problem it solves, or the workflow you wish existed — I'll log it and tell you if it's already planned.</div></div>
+          </div>
+        </div>
+        <div class="chips" id="chips">
+          <span class="c">Add custom vocabulary</span>
+          <span class="c">Auto-punctuation toggle</span>
+          <span class="c">Send transcript to ChatGPT</span>
+          <span class="c">Per-app language</span>
+        </div>
+        <div class="card composer">
+          <textarea id="reqInput" placeholder="Describe the feature you'd like… (⏎ to send)"></textarea>
+          <button class="btn primary" id="reqSend">Send</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // ---- theme ----
+  const root = document.documentElement;
+  const themeBtns = [...document.querySelectorAll('[data-theme-set]')];
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  function applyTheme(t){
+    themeBtns.forEach(b => b.classList.toggle('on', b.dataset.themeSet === t));
+    if (t === 'system') root.dataset.theme = mq.matches ? 'light' : 'dark';
+    else root.dataset.theme = t;
+    root.dataset.choice = t;
+  }
+  themeBtns.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeSet)));
+  mq.addEventListener('change', () => { if (root.dataset.choice === 'system') applyTheme('system'); });
+  applyTheme('dark');
+
+  // ---- nav ----
+  const views = [...document.querySelectorAll('.view')];
+  document.querySelectorAll('[data-view]').forEach(a => a.addEventListener('click', () => {
+    document.querySelectorAll('.nav a').forEach(n => n.classList.toggle('active', n === a));
+    views.forEach(v => v.classList.toggle('on', v.id === 'v-' + a.dataset.view));
+  }));
+
+  // ---- generic toggles ----
+  document.querySelectorAll('[data-t]').forEach(t => t.addEventListener('click', () => t.classList.toggle('on')));
+
+  // ---- single-select pickers ----
+  document.querySelectorAll('[data-single]').forEach(p =>
+    p.querySelectorAll('.opt').forEach(o => o.addEventListener('click', () => {
+      p.querySelectorAll('.opt').forEach(x => x.classList.remove('sel')); o.classList.add('sel');
+    })));
+
+  // ---- home orb ----
+  const orb = document.getElementById('orb'), status = document.getElementById('homeStatus'), hint = document.getElementById('orbHint');
+  document.getElementById('orbCore').addEventListener('click', () => {
+    if (orb.classList.contains('rec')) return;
+    orb.classList.add('rec'); status.innerHTML = '<span class="dot"></span>Recording'; hint.textContent = 'Listening…';
+    setTimeout(() => { hint.textContent = 'Transcribing…'; }, 1500);
+    setTimeout(() => { orb.classList.remove('rec'); status.innerHTML = '<span class="dot"></span>Idle';
+      hint.textContent = '“I\'ll have the analysis ready by Thursday.”'; }, 2400);
+  });
+
+  // ---- history mock ----
+  const HIST = [
+    {t:'14:22', x:"Draft a reply to Priya — I'll have the analysis ready by Thursday.", m:'ptt', l:'English'},
+    {t:'14:03', x:'Summarize the meeting notes into three bullet points for the team.', m:'toggle', l:'English'},
+    {t:'13:47', x:'Add a follow-up task to review the onboarding metrics next week.', m:'ptt', l:'English'},
+    {t:'11:20', x:'कल की मीटिंग दोपहर तीन बजे रीशेड्यूल कर दो।', m:'ptt', l:'Hindi'},
+    {t:'10:05', x:'Remind me to push the release build before standup tomorrow.', m:'toggle', l:'English'},
+  ];
+  const hlist = document.getElementById('hlist'), hsearch = document.getElementById('hsearch');
+  function renderHist(q=''){
+    const rows = HIST.filter(e => e.x.toLowerCase().includes(q.toLowerCase()));
+    hlist.innerHTML = rows.length ? '' : '<div style="text-align:center;color:var(--faint);margin-top:40px">No matches.</div>';
+    rows.forEach(e => {
+      const el = document.createElement('div'); el.className = 'card hud entry';
+      el.innerHTML = `<div class="meta"><span class="t">${e.t}</span><span class="badge">${e.l}</span><span class="badge">${e.m}</span><button class="copy">Copy</button></div><div class="x">${e.x}</div>`;
+      el.querySelector('.copy').addEventListener('click', ev => { ev.target.textContent='Copied'; setTimeout(()=>ev.target.textContent='Copy',1200); });
+      hlist.appendChild(el);
+    });
+  }
+  hsearch.addEventListener('input', () => renderHist(hsearch.value)); renderHist();
+
+  // ---- backup connect ----
+  document.getElementById('bconnect').addEventListener('click', function(){
+    this.textContent='Connecting…';
+    setTimeout(()=>{ this.closest('.card').style.display='none';
+      document.getElementById('bconnected').style.display='block'; }, 800);
+  });
+
+  // ---- request → agent ----
+  const thread = document.getElementById('thread'), input = document.getElementById('reqInput'), send = document.getElementById('reqSend');
+  function bubble(who, cls, html){
+    const m = document.createElement('div'); m.className = 'msg ' + cls;
+    const av = cls==='me' ? '<div class="av">you</div>'
+      : '<div class="av"><div class="chip" style="width:30px;height:30px;border-radius:9px"><i></i><i></i><i></i><i></i></div></div>';
+    m.innerHTML = av + `<div><div class="who">${who}</div><div class="bubble">${html}</div></div>`;
+    thread.appendChild(m); thread.scrollTop = thread.scrollHeight; return m;
+  }
+  function submit(){
+    const v = input.value.trim(); if(!v) return; input.value='';
+    bubble('you','me', v.replace(/</g,'&lt;'));
+    const t = bubble('flo · AI','agent','<span class="typing"><span></span><span></span><span></span></span>');
+    setTimeout(()=>{ t.querySelector('.bubble').innerHTML =
+      `Got it — logged as a feature request. I've tagged it and added it to the roadmap for the team to review. `
+      + `If something similar ships, you'll get a note in an update. Anything else you'd change?`;
+      thread.scrollTop = thread.scrollHeight; }, 1100);
+  }
+  send.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submit(); } });
+  document.querySelectorAll('#chips .c').forEach(c => c.addEventListener('click', () => { input.value = c.textContent; input.focus(); }));
+</script>
+</body>
+</html>

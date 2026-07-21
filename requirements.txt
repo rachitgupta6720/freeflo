@@ -18,11 +18,16 @@ cryptography>=42.0
 cachetools>=5.0
 rsa>=4.9
 
+# Opt-in, consent-gated telemetry (engine/telemetry.py) — inert without keys
+posthog>=3.0,<4                     # anonymous usage analytics + identity
+sentry-sdk>=2.0                     # crash reporting
+
 # PyObjC bridges (pull in pyobjc-core automatically)
 pyobjc-framework-Cocoa>=10.0
 pyobjc-framework-Quartz>=10.0       # CGEventTap hotkey listener
 pyobjc-framework-WebKit>=10.0       # history/settings window
 pyobjc-framework-ApplicationServices>=10.0  # Accessibility permission check
+pyobjc-framework-AVFoundation>=10.0  # microphone authorization (onboarding)
 
 # Building a standalone .app bundle (optional — see README "Building")
 # py2app>=0.28

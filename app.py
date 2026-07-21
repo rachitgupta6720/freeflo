@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import logging
 import threading
 import subprocess
 import rumps
@@ -10,8 +11,10 @@ import config as cfg
 from engine.recorder import Recorder
 from engine.transcriber import transcribe
 from engine.injector import inject
-from engine import history, gauth, backup
+from engine import history, gauth, backup, logs, updater, telemetry
 from hotkey import HotkeyListener
+
+log = logging.getLogger('freeflo.app')
 
 _ICONS = {
     'idle':       '🎙',
@@ -108,6 +111,29 @@ class FreefloApp(rumps.App):
             callback=self._restart_app,
         )
 
+        # Self-update. The title flips to a download prompt once a newer release
+        # is found. Result is passed from the worker thread to the main-thread
+        # poll timer via _pending_update / _update_dirty (no cross-thread UI).
+        self._update_item = rumps.MenuItem('Check for Updates…', callback=self._on_update_menu)
+        self._pending_update = None
+        self._update_status = None
+        self._update_dirty = False
+        self._updating = False
+
+        # Troubleshooting — local, zero-network diagnostics for bug reports.
+        self._help_menu = rumps.MenuItem('Troubleshooting')
+        self._help_menu.add(rumps.MenuItem('Reveal Logs', callback=self._reveal_logs))
+        self._help_menu.add(rumps.MenuItem('Copy Diagnostics', callback=self._copy_diagnostics))
+
+        # First-run onboarding.
+        self._setup_item = rumps.MenuItem('Rerun Setup…', callback=self._open_onboarding)
+        self._ob_ui = None            # onboarding WindowController (lazily created)
+        self._ob_mic_requested = False  # user tapped Grant on the mic step
+        # Cache the Keychain-backed connection state so the onboarding status
+        # poll doesn't read the Keychain every tick (each read triggers a macOS
+        # Keychain authorization prompt on an unsigned build). None = not read yet.
+        self._ob_connected = None
+
         # Language submenu — checkmark tracks the active language
         current_lang = settings.get('language', 'en')
         self._lang_menu_items = {}   # name -> (MenuItem, code)
@@ -137,6 +163,9 @@ class FreefloApp(rumps.App):
             self._status_item,
             None,
             lang_menu,
+            self._update_item,
+            self._setup_item,
+            self._help_menu,
             None,
         ]
 
@@ -162,6 +191,14 @@ class FreefloApp(rumps.App):
         # Catch up on any backup that happened on another Mac since we last ran.
         self._maybe_sync_backup()
 
+        # First launch (or after a reset): open onboarding once the run loop is up.
+        if not settings.get('onboarded'):
+            rumps.Timer(self._launch_onboarding, 0.8).start()
+
+        # Check for a newer release shortly after launch, then every 6 hours.
+        rumps.Timer(self._launch_update_check, 6.0).start()
+        rumps.Timer(self._periodic_update_check, 6 * 3600).start()
+
     # ------------------------------------------------------------------
     # Thread-safe state helpers
     # ------------------------------------------------------------------
@@ -184,6 +221,24 @@ class FreefloApp(rumps.App):
         state, status = self._get_state()
         self.title = _ICONS.get(state, _ICONS['idle'])
         self._status_item.title = f'● {status}'
+
+        # Reflect any update-check result produced on a worker thread. Touching
+        # the menu / posting notifications must happen here on the main thread.
+        if self._update_dirty:
+            self._update_dirty = False
+            if self._pending_update:
+                v = self._pending_update['version']
+                self._update_item.title = f'⬇  Download update (v{v})'
+                rumps.notification(
+                    'freeflo', f'Update available — v{v}',
+                    (self._pending_update.get('notes') or '')[:140]
+                    or 'Open the menu to download.',
+                )
+            elif not self._updating:
+                self._update_item.title = 'Check for Updates…'
+            if self._update_status:
+                rumps.notification('freeflo', self._update_status, '')
+                self._update_status = None
 
         # Re-check Accessibility every ~3 s. This is a cheap, crash-safe call
         # (unlike the old CGEventTap probe, which crashed natively — see the
@@ -254,6 +309,7 @@ class FreefloApp(rumps.App):
                 self._ui = WindowController(on_message=self._on_ui_message)
             self._ui.show()
         except Exception as e:
+            log.exception('Could not open the window')
             rumps.alert('freeflo', f'Could not open the window:\n{e}')
 
     def _push_ui(self, name, payload):
@@ -305,6 +361,20 @@ class FreefloApp(rumps.App):
             settings['save_history'] = on
             cfg.save(settings)
             self._push_ui('save_history_state', {'on': on})
+        elif action == 'get_privacy':
+            self._send_privacy()
+        elif action == 'set_privacy':
+            settings = cfg.load()
+            try:
+                if body.get('analytics') is not None:
+                    settings['analytics_enabled'] = bool(body.get('analytics'))
+                if body.get('crash') is not None:
+                    settings['crash_enabled'] = bool(body.get('crash'))
+            except Exception:
+                pass
+            cfg.save(settings)
+            telemetry.identify()   # re-attach identity if analytics was just turned on
+            self._send_privacy()
         elif action == 'get_backup_status':
             self._send_backup_status()
         elif action == 'set_backup_enabled':
@@ -330,6 +400,23 @@ class FreefloApp(rumps.App):
             ).start()
         elif action == 'backup_sync_now':
             self._maybe_sync_backup(manual=True)
+        elif action == 'get_home':
+            self._send_home()
+        elif action == 'set_language':
+            self._set_language_from_ui(body)
+        elif action == 'get_theme':
+            self._send_theme()
+        elif action == 'set_theme':
+            self._set_theme(body)
+        elif action == 'feature_request':
+            self._handle_feature_request(body)
+
+    def _send_privacy(self):
+        s = cfg.load()
+        self._push_ui('privacy', {
+            'analytics': s.get('analytics_enabled', True),
+            'crash': s.get('crash_enabled', True),
+        })
 
     def _send_history(self, query):
         try:
@@ -376,6 +463,7 @@ class FreefloApp(rumps.App):
         settings['backup_account_email'] = email
         settings['backup_enabled'] = True
         cfg.save(settings)
+        telemetry.capture('backup_connected', {'source': 'settings'})
         self._send_backup_status()
         self._maybe_sync_backup(manual=True)
 
@@ -416,6 +504,7 @@ class FreefloApp(rumps.App):
         try:
             result = backup.sync()
         except Exception as e:
+            log.warning('Backup sync failed: %s', e)
             self._backup_lock.release()
             self._send_backup_status({'error': f'Sync failed: {e}'})
             return
@@ -428,10 +517,13 @@ class FreefloApp(rumps.App):
     def _send_shortcuts(self):
         settings = cfg.load()
         keys = [{'id': k, 'label': v['label']} for k, v in cfg.HOTKEY_KEYS.items()]
+        languages = [{'code': code, 'name': name} for name, code in _LANGUAGES if name]
         self._push_ui('shortcuts', {
             'keys': keys,
             'ptt_key': settings.get('ptt_key', 'left_option'),
             'toggle_key': settings.get('toggle_key', 'right_option'),
+            'language': settings.get('language', 'en'),
+            'languages': languages,
         })
 
     def _set_shortcuts(self, body):
@@ -459,6 +551,73 @@ class FreefloApp(rumps.App):
         self._send_shortcuts()
         self._push_ui('shortcuts_saved', {'ok': True})
 
+    def _send_home(self):
+        """Dashboard payload: usage stats + recent activity for the Home view."""
+        try:
+            st = history.stats()
+        except Exception:
+            st = {'total': 0, 'today': 0, 'words_week': 0}
+        try:
+            recent = history.list_entries(limit=6)
+        except Exception:
+            recent = []
+        settings = cfg.load()
+        self._push_ui('home', {
+            'stats': st,
+            'language': settings.get('language', 'en'),
+            'ptt_key': settings.get('ptt_key', 'left_option'),
+            'enabled': self._enabled,
+            'recent': recent,
+        })
+
+    def _set_language_from_ui(self, body):
+        try:
+            code = str(body.get('code'))
+        except Exception:
+            return
+        name = next((n for n, c in _LANGUAGES if n and c == code), code)
+        self._set_language(code, name)   # persists + updates the menu checkmark
+        self._send_shortcuts()           # echo new selection back to the window
+
+    def _send_theme(self):
+        s = cfg.load()
+        self._push_ui('theme', {
+            'theme': s.get('theme', 'system'),
+            'glass': bool(s.get('glass')),
+        })
+
+    def _set_theme(self, body):
+        try:
+            t = str(body.get('theme'))
+        except Exception:
+            return
+        if t not in ('system', 'light', 'dark', 'glass'):
+            return
+        s = cfg.load()
+        s['theme'] = t
+        s['glass'] = (t == 'glass')
+        cfg.save(s)
+        self._send_theme()
+
+    def _handle_feature_request(self, body):
+        """Capture a feature request. For now (no backend) it goes to the log
+        and — if analytics consent is on — a PostHog event. The text here is a
+        user-authored feature idea, not a transcription."""
+        try:
+            text = str(body.get('text') or '').strip()
+        except Exception:
+            text = ''
+        if not text:
+            self._push_ui('feature_ack', {'ok': False})
+            return
+        settings = cfg.load()
+        log.info('Feature request submitted (%d chars)', len(text))
+        telemetry.capture('feature_requested', {
+            'text': text[:1000],
+            'role': settings.get('profile_role'),
+        })
+        self._push_ui('feature_ack', {'ok': True})
+
     def _prompt_accessibility_once(self, timer):
         """One-shot timer — fires 1 s after run() so the NSApp run loop is
         active when we ask macOS to highlight this app in the Accessibility list."""
@@ -481,6 +640,249 @@ class FreefloApp(rumps.App):
             close_fds=True,
         )
         rumps.quit_application()
+
+    # ------------------------------------------------------------------
+    # Self-update (GitHub Releases) + local diagnostics
+    # ------------------------------------------------------------------
+
+    def _launch_update_check(self, timer):
+        timer.stop()   # one-shot
+        threading.Thread(target=self._check_updates_worker, args=(True,),
+                         daemon=True).start()
+
+    def _periodic_update_check(self, _):
+        threading.Thread(target=self._check_updates_worker, args=(True,),
+                         daemon=True).start()
+
+    def _check_updates_worker(self, auto):
+        """Query GitHub for a newer release. Runs off the main thread; hands the
+        result back via _pending_update / _update_dirty for _poll_state."""
+        info = updater.check_for_update(cfg.get_version())
+        self._pending_update = info
+        if info:
+            log.info('Update available: v%s', info['version'])
+        elif not auto:
+            self._update_status = "You're up to date"
+        self._update_dirty = True
+
+    def _on_update_menu(self, _):
+        if self._updating:
+            return
+        if self._pending_update:
+            self._updating = True
+            self._update_item.title = 'Downloading update…'
+            threading.Thread(target=self._download_update_worker, daemon=True).start()
+        else:
+            self._update_item.title = 'Checking…'
+            threading.Thread(target=self._check_updates_worker, args=(False,),
+                             daemon=True).start()
+
+    def _download_update_worker(self):
+        info = self._pending_update or {}
+        try:
+            path = updater.download_update(info.get('download_url'), info.get('version'))
+            updater.reveal(path)
+            telemetry.capture('update_downloaded', {'to_version': info.get('version')})
+            self._update_status = 'Update downloaded — open it, then drag to Applications'
+        except Exception as e:
+            log.warning('Update download failed (%s); opening release page', e)
+            updater.open_url(info.get('url'))
+            self._update_status = 'Opened the download page in your browser'
+        finally:
+            self._updating = False
+            self._update_dirty = True
+
+    # ------------------------------------------------------------------
+    # Onboarding (first-run flow in ui/onboarding.html)
+    # ------------------------------------------------------------------
+
+    def _launch_onboarding(self, timer):
+        timer.stop()   # one-shot
+        self._open_onboarding()
+
+    def _open_onboarding(self, _=None):
+        try:
+            from ui.window import WindowController
+            if self._ob_ui is None:
+                self._ob_ui = WindowController(
+                    on_message=self._on_onboarding_message,
+                    html_file='onboarding.html',
+                    title='Welcome to freeflo',
+                    size=(940, 660),
+                )
+            self._ob_ui.show()
+        except Exception:
+            log.exception('Could not open onboarding')
+
+    def _push_ob(self, name, payload):
+        if self._ob_ui is None:
+            return
+        try:
+            self._ob_ui.send(name, payload)
+        except Exception:
+            pass
+
+    def _on_onboarding_message(self, body):
+        """JS->Python for the onboarding window (runs on the main thread)."""
+        try:
+            action = body.get('action') if hasattr(body, 'get') else None
+        except Exception:
+            action = None
+        action = str(action) if action is not None else ''
+
+        if action == 'ob_get_state':
+            self._send_ob_state()
+        elif action == 'ob_grant_mic':
+            self._ob_mic_requested = True
+            from engine import permissions
+            permissions.request_mic()
+            self._send_ob_state()
+        elif action == 'ob_grant_accessibility':
+            self._open_accessibility(None)
+            self._send_ob_state()
+        elif action == 'ob_set_consent':
+            self._save_consent(body)
+        elif action == 'ob_set_profile':
+            self._save_profile(body)
+        elif action == 'ob_google_signin':
+            threading.Thread(target=self._ob_signin_worker, daemon=True).start()
+        elif action == 'ob_set_backup':
+            try:
+                on = bool(body.get('on'))
+            except Exception:
+                on = False
+            settings = cfg.load()
+            settings['backup_enabled'] = on
+            cfg.save(settings)
+            if on:
+                self._maybe_sync_backup(manual=True)
+        elif action == 'ob_test_start':
+            if self._begin_recording('ob_test'):
+                self._push_ob('ob_test_state', {'recording': True})
+            else:
+                self._push_ob('ob_test_result', {'text': '', 'note': 'Busy — try again'})
+        elif action == 'ob_test_stop':
+            self._end_recording('ob_test', transcribe=True)
+        elif action == 'ob_complete':
+            self._complete_onboarding(body)
+
+    def _ob_is_connected(self):
+        """Cached gauth.is_connected() — read the Keychain at most once per
+        onboarding session (each read prompts on an unsigned build)."""
+        if self._ob_connected is None:
+            try:
+                self._ob_connected = gauth.is_connected()
+            except Exception:
+                self._ob_connected = False
+        return self._ob_connected
+
+    def _send_ob_state(self):
+        from engine import permissions
+        settings = cfg.load()
+        mic = permissions.mic_status()
+        # When AVFoundation can't report status ('unknown'), treat a grant tap as
+        # success so users on such setups aren't blocked; the mic test confirms.
+        mic_granted = (mic == 'authorized') or (mic == 'unknown' and self._ob_mic_requested)
+        self._push_ob('ob_state', {
+            'mic': mic,
+            'mic_granted': bool(mic_granted),
+            'accessibility': bool(AXIsProcessTrusted()),
+            'google_configured': gauth.is_configured(),
+            'google_connected': self._ob_is_connected(),
+            'analytics': settings.get('analytics_enabled', True),
+            'crash': settings.get('crash_enabled', True),
+            'profile': {
+                'name': settings.get('profile_name') or '',
+                'email': settings.get('profile_email') or '',
+                'role': settings.get('profile_role') or '',
+                'goal': settings.get('profile_goal') or '',
+            },
+        })
+
+    def _save_consent(self, body):
+        if not hasattr(body, 'get'):
+            return
+        settings = cfg.load()
+        try:
+            if body.get('analytics') is not None:
+                settings['analytics_enabled'] = bool(body.get('analytics'))
+            if body.get('crash') is not None:
+                settings['crash_enabled'] = bool(body.get('crash'))
+        except Exception:
+            return
+        cfg.save(settings)
+
+    def _save_profile(self, body):
+        if not hasattr(body, 'get'):
+            return
+        settings = cfg.load()
+        name, role, goal = body.get('name'), body.get('role'), body.get('goal')
+        if name:
+            settings['profile_name'] = str(name)
+        if role:
+            settings['profile_role'] = str(role)
+        if goal:
+            settings['profile_goal'] = str(goal)
+        cfg.save(settings)
+
+    def _ob_signin_worker(self):
+        """Google sign-in for identity (name + email). Blocks on the browser
+        redirect, so it runs off the main thread."""
+        try:
+            info = gauth.connect_full()
+        except gauth.NotConfigured as e:
+            self._push_ob('ob_signin_result', {'ok': False, 'error': str(e)})
+            return
+        except Exception as e:
+            log.warning('Onboarding Google sign-in failed: %s', e)
+            self._push_ob('ob_signin_result', {'ok': False, 'error': f'Sign-in failed: {e}'})
+            return
+        settings = cfg.load()
+        if info.get('email'):
+            settings['profile_email'] = info['email']
+            settings['backup_account_email'] = info['email']
+        if info.get('name'):
+            settings['profile_name'] = info['name']
+        cfg.save(settings)
+        self._ob_connected = True   # refresh the cache after a successful sign-in
+        telemetry.capture('backup_connected', {'source': 'onboarding'})
+        self._push_ob('ob_signin_result',
+                      {'ok': True, 'name': info.get('name', ''), 'email': info.get('email', '')})
+        self._send_ob_state()
+
+    def _complete_onboarding(self, body):
+        self._save_consent(body)
+        self._save_profile(body)
+        settings = cfg.load()
+        settings['onboarded'] = True
+        settings['consent_version'] = 1
+        cfg.save(settings)
+        cfg.get_or_create_install_id()
+        log.info('Onboarding complete (analytics=%s crash=%s role=%s)',
+                 settings.get('analytics_enabled'), settings.get('crash_enabled'),
+                 settings.get('profile_role'))
+        telemetry.identify()
+        telemetry.capture('onboarding_completed', {
+            'mic': bool(AXIsProcessTrusted()),   # best-effort snapshot
+            'signed_in': gauth.is_connected(),
+            'role': settings.get('profile_role'),
+            'analytics': settings.get('analytics_enabled'),
+            'crash': settings.get('crash_enabled'),
+        })
+        if self._ob_ui is not None:
+            self._ob_ui.close()
+
+    def _reveal_logs(self, _):
+        subprocess.run(['open', logs.log_dir()], capture_output=True)
+
+    def _copy_diagnostics(self, _):
+        try:
+            subprocess.run(['pbcopy'], input=logs.diagnostics().encode('utf-8'),
+                           capture_output=True)
+            rumps.notification('freeflo', 'Diagnostics copied',
+                               'Paste it into your bug report.')
+        except Exception as e:
+            log.warning('Copy diagnostics failed: %s', e)
 
     def _set_language(self, code, name):
         """Update checkmark and persist the language choice."""
@@ -542,6 +944,8 @@ class FreefloApp(rumps.App):
             self._set_state('idle', 'Too short — try again')
             if mode == 'test':
                 self._push_ui('test_result', {'text': '', 'note': 'Too short — try again'})
+            elif mode == 'ob_test':
+                self._push_ob('ob_test_result', {'text': '', 'note': 'Too short — try again'})
             self._busy_lock.release()
 
     # ------------------------------------------------------------------
@@ -589,19 +993,29 @@ class FreefloApp(rumps.App):
         way a successful transcription is logged to history."""
         try:
             text = transcribe(wav_path)
-            if mode == 'test':
+            if mode in ('test', 'ob_test'):
                 self._set_state('idle', 'Ready')
-                self._push_ui('test_result', {'text': text or ''})
+                payload = {'text': text or ''}
+                if mode == 'ob_test':
+                    self._push_ob('ob_test_result', payload)
+                else:
+                    self._push_ui('test_result', payload)
             elif text:
                 inject(text)
                 self._set_state('idle', f'"{text[:40]}{"…" if len(text) > 40 else ""}"')
+                telemetry.dictation_completed(
+                    mode, cfg.load().get('language'), duration, len(text))
             else:
                 self._set_state('idle', 'Nothing heard — try again')
-            self._log_history(text, mode, duration)
+            if mode != 'ob_test':   # onboarding tests aren't saved to history
+                self._log_history(text, mode, duration)
         except Exception as e:
+            log.exception('Transcription failed (mode=%s)', mode)
             self._set_state('idle', f'Error: {e}')
             if mode == 'test':
                 self._push_ui('test_result', {'text': '', 'note': f'Error: {e}'})
+            elif mode == 'ob_test':
+                self._push_ob('ob_test_result', {'text': '', 'note': f'Error: {e}'})
         finally:
             self._busy_lock.release()
 
@@ -617,9 +1031,16 @@ class FreefloApp(rumps.App):
             history.add(text, language=settings.get('language'),
                         mode=mode, duration=duration)
         except Exception:
-            pass
+            log.exception('Failed to log transcription to history')
         self._maybe_sync_backup()
 
 
 if __name__ == '__main__':
-    FreefloApp().run()
+    logs.setup_logging()
+    logs.install_excepthooks()
+    telemetry.init()   # consent-gated + inert without keys; never sends text
+    try:
+        FreefloApp().run()
+    except Exception:
+        log.critical('Fatal error during startup/run', exc_info=True)
+        raise

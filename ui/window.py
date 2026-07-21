@@ -67,8 +67,12 @@ class _WindowDelegate(NSObject):
 
 
 class WindowController:
-    def __init__(self, on_message=None):
+    def __init__(self, on_message=None, html_file='index.html',
+                 title='freeflo', size=(920.0, 660.0)):
         self._on_message = on_message or (lambda body: None)
+        self._html_file = html_file
+        self._title = title
+        self._size = size
         self._window = None
         self._webview = None
         self._delegate = None
@@ -81,7 +85,7 @@ class WindowController:
         self._present()
 
     def _build(self):
-        rect = ((0.0, 0.0), (920.0, 660.0))
+        rect = ((0.0, 0.0), (float(self._size[0]), float(self._size[1])))
 
         bridge = _Bridge.alloc().initWithCallback_(self._on_message)
         ucc = WKUserContentController.alloc().init()
@@ -100,7 +104,7 @@ class WindowController:
         window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
             rect, style, NSBackingStoreBuffered, False
         )
-        window.setTitle_('freeflo')
+        window.setTitle_(self._title)
         window.center()
         window.setReleasedWhenClosed_(False)
         window.setContentView_(webview)
@@ -109,7 +113,7 @@ class WindowController:
         window.setDelegate_(delegate)
 
         ui_dir = config.get_ui_dir()
-        html = os.path.join(ui_dir, 'index.html')
+        html = os.path.join(ui_dir, self._html_file)
         webview.loadFileURL_allowingReadAccessToURL_(
             NSURL.fileURLWithPath_(html),
             NSURL.fileURLWithPath_(ui_dir),
@@ -126,6 +130,13 @@ class WindowController:
         app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
         app.activateIgnoringOtherApps_(True)
         self._window.makeKeyAndOrderFront_(None)
+
+    def close(self):
+        """Close the window (safe from any thread)."""
+        if self._window is not None:
+            self._window.performSelectorOnMainThread_withObject_waitUntilDone_(
+                'close', None, False
+            )
 
     def send(self, name, payload):
         """Push an event to the web UI. Safe to call from any thread — the
