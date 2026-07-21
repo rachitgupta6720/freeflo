@@ -13,6 +13,7 @@ by the next merge. `synced_at` tracks whether a row's current state has
 already reached the backup.
 """
 import os
+import json
 import time
 import uuid as _uuidlib
 import sqlite3
@@ -104,6 +105,57 @@ def list_entries(query=None, limit=300):
          'language': r[4], 'mode': r[5], 'duration': r[6]}
         for r in rows
     ]
+
+
+_SNAPSHOT_SCHEMA = 1
+
+
+def snapshot_path():
+    return os.path.join(config._CONFIG_DIR, 'history-snapshot.json')
+
+
+def write_snapshot():
+    """Atomically write a local JSON snapshot of every entry (including
+    soft-delete tombstones) — an always-on safety net so history survives DB
+    corruption or accidental deletion even when cloud backup is off. Returns
+    the number of entries written."""
+    entries = all_entries_for_sync()
+    path = snapshot_path()
+    tmp = path + '.tmp'
+    os.makedirs(config._CONFIG_DIR, exist_ok=True)
+    with open(tmp, 'w') as f:
+        json.dump({'schema': _SNAPSHOT_SCHEMA, 'written': time.time(),
+                   'entries': entries}, f)
+    os.replace(tmp, path)   # atomic on the same filesystem
+    return len(entries)
+
+
+def restore_from_snapshot_if_empty():
+    """If the DB holds no rows (fresh/corrupted/reset) but a local snapshot
+    exists, merge the snapshot back in. Uses the same last-write-wins upsert as
+    remote restore, so it's safe even if the DB isn't truly empty. Returns the
+    number of entries restored (0 if nothing to do)."""
+    conn = _connect()
+    try:
+        n = conn.execute("SELECT COUNT(*) FROM history").fetchone()[0]
+    finally:
+        conn.close()
+    if n > 0:
+        return 0
+    path = snapshot_path()
+    if not os.path.exists(path):
+        return 0
+    try:
+        with open(path) as f:
+            entries = json.load(f).get('entries', [])
+    except (OSError, ValueError):
+        return 0
+    for e in entries:
+        try:
+            upsert_from_remote(e)
+        except Exception:
+            pass
+    return len(entries)
 
 
 def stats():

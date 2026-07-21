@@ -60,10 +60,21 @@ def _bundle_path():
 
 class FreefloApp(rumps.App):
     def __init__(self):
-        super().__init__('freeflo', title=_ICONS['idle'], quit_button='Quit')
+        # quit_button=None — we install a custom Quit that flushes a final
+        # snapshot + backup sync before exiting (see _quit).
+        super().__init__('freeflo', title=_ICONS['idle'], quit_button=None)
 
         settings = cfg.load()
         self._enabled = settings.get('enabled', True)
+
+        # Restore history from the local snapshot if the DB came up empty
+        # (corruption / reset) — before anything reads or writes history.
+        try:
+            restored = history.restore_from_snapshot_if_empty()
+            if restored:
+                log.warning('Restored %d history entries from local snapshot', restored)
+        except Exception:
+            log.exception('Snapshot restore check failed')
 
         # Shared state — written from any thread, read by timer on main thread
         self._state = 'idle' if self._enabled else 'disabled'
@@ -80,7 +91,14 @@ class FreefloApp(rumps.App):
         self._record_mode = None      # 'ptt' | 'toggle' | None, guarded by _toggle_lock
 
         # Guards against overlapping backup syncs (e.g. rapid-fire dictation).
+        # _backup_pending coalesces a sync requested while one is already
+        # running, so the last utterance before quit is never left unsynced.
         self._backup_lock = threading.Lock()
+        self._backup_pending = False
+        self._backup_retry_scheduled = False
+        # Local snapshot writer — same coalescing pattern, off the dictation path.
+        self._snapshot_lock = threading.Lock()
+        self._snapshot_pending = False
 
         ptt = cfg.resolve_key(settings.get('ptt_key', 'left_option'))
         tog = cfg.resolve_key(settings.get('toggle_key', 'right_option'))
@@ -167,6 +185,7 @@ class FreefloApp(rumps.App):
             self._setup_item,
             self._help_menu,
             None,
+            rumps.MenuItem('Quit freeflo', callback=self._quit),
         ]
 
         # The hotkeys use an *active* CGEventTap, which is gated by
@@ -496,23 +515,96 @@ class FreefloApp(rumps.App):
                 self._send_backup_status({'error': 'Connect Google Backup first.'})
             return
         if not self._backup_lock.acquire(blocking=False):
+            # A sync is already running; ask it to run once more when it
+            # finishes so a dictation that landed mid-sync isn't left behind.
+            self._backup_pending = True
             return
+        self._backup_pending = False
         threading.Thread(target=self._sync_backup_worker, daemon=True).start()
 
     def _sync_backup_worker(self):
         self._send_backup_status()  # reflects syncing=True
         try:
-            result = backup.sync()
+            result = None
+            while True:
+                result = backup.sync()
+                # Drain any request that arrived while we were syncing.
+                if not self._backup_pending:
+                    break
+                self._backup_pending = False
         except Exception as e:
             log.warning('Backup sync failed: %s', e)
             self._backup_lock.release()
             self._send_backup_status({'error': f'Sync failed: {e}'})
+            self._schedule_backup_retry()
             return
         settings = cfg.load()
         settings['backup_last_synced'] = result['synced_at']
         cfg.save(settings)
         self._backup_lock.release()
         self._send_backup_status()
+
+    def _schedule_backup_retry(self, delay=120.0):
+        """After a failed sync, retry once after a delay so unsynced entries
+        aren't stranded until the next dictation or launch. Coalesced so
+        repeated failures don't stack timers."""
+        if self._backup_retry_scheduled:
+            return
+        self._backup_retry_scheduled = True
+
+        def _retry():
+            self._backup_retry_scheduled = False
+            self._maybe_sync_backup()
+        threading.Timer(delay, _retry).start()
+
+    # ------------------------------------------------------------------
+    # Local snapshot safety net + clean-quit flush
+    # ------------------------------------------------------------------
+
+    def _write_snapshot_async(self):
+        """Write a local history snapshot off the dictation path, coalescing
+        overlapping requests (same pattern as backup sync)."""
+        if not self._snapshot_lock.acquire(blocking=False):
+            self._snapshot_pending = True
+            return
+        self._snapshot_pending = False
+        threading.Thread(target=self._snapshot_worker, daemon=True).start()
+
+    def _snapshot_worker(self):
+        try:
+            while True:
+                history.write_snapshot()
+                if not self._snapshot_pending:
+                    break
+                self._snapshot_pending = False
+        except Exception as e:
+            log.warning('History snapshot failed: %s', e)
+        finally:
+            self._snapshot_lock.release()
+
+    def _flush_backup_blocking(self):
+        try:
+            if (cfg.load().get('backup_enabled') and history.dirty_entries()
+                    and gauth.is_connected()):
+                backup.sync()
+        except Exception as e:
+            log.warning('Final backup flush failed: %s', e)
+
+    def _quit(self, _):
+        """Flush a final local snapshot + best-effort backup sync, then quit.
+        The backup flush is bounded so a hung network can't block quitting."""
+        try:
+            history.write_snapshot()
+        except Exception:
+            log.exception('Snapshot on quit failed')
+        t = threading.Thread(target=self._flush_backup_blocking, daemon=True)
+        t.start()
+        t.join(timeout=6.0)
+        try:
+            telemetry.flush()
+        except Exception:
+            pass
+        rumps.quit_application()
 
     def _send_shortcuts(self):
         settings = cfg.load()
@@ -1032,13 +1124,23 @@ class FreefloApp(rumps.App):
                         mode=mode, duration=duration)
         except Exception:
             log.exception('Failed to log transcription to history')
-        self._maybe_sync_backup()
+        self._write_snapshot_async()   # local safety net, every utterance
+        self._maybe_sync_backup()      # cloud mirror if connected
 
 
 if __name__ == '__main__':
+    import atexit
     logs.setup_logging()
     logs.install_excepthooks()
     telemetry.init()   # consent-gated + inert without keys; never sends text
+
+    def _snapshot_on_exit():
+        try:
+            history.write_snapshot()
+        except Exception:
+            pass
+    atexit.register(_snapshot_on_exit)   # backstop for exits that skip the Quit menu
+
     try:
         FreefloApp().run()
     except Exception:
