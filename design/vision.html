@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>freeflo — Vision</title>
+<meta name="description" content="Talk to your machine the way you talk to a person. freeflo's vision, principles, and roadmap — on-device, private, and evolving with its users.">
+<style>
+  :root{
+    --bg:#08080a; --bg-2:#0c0c0f; --surface:#111116; --surface-2:#17171c; --surface-3:#1e1e24;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12); --line-3:rgba(255,255,255,.20);
+    --text:#f5f5f6; --muted:#a0a0a8; --faint:#6b6b74;
+    --hi:#ffffff; --ink:#0a0a0c; --glow:rgba(255,255,255,.18);
+    --wm:linear-gradient(180deg,#fff 0%,#d4d4da 46%,#f6f6f8 56%,#9a9aa3 100%);
+    --maxw:980px;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Monaco,monospace;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  html,body{overflow-x:hidden;max-width:100%}
+  body{margin:0;font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.65;position:relative}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+  /* ambient backdrop: grid + drifting glow */
+  body::before{content:"";position:fixed;inset:0;z-index:-3;
+    background:
+      radial-gradient(820px 560px at 82% -8%, rgba(255,255,255,.06), transparent 55%),
+      radial-gradient(700px 560px at 8% 108%, rgba(255,255,255,.04), transparent 55%),
+      var(--bg);}
+  body::after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background-image:linear-gradient(to right,var(--line) 1px,transparent 1px),
+                     linear-gradient(to bottom,var(--line) 1px,transparent 1px);
+    background-size:46px 46px;
+    -webkit-mask-image:radial-gradient(1200px 820px at 50% 0%,#000 38%,transparent 82%);
+            mask-image:radial-gradient(1200px 820px at 50% 0%,#000 38%,transparent 82%);opacity:.5;}
+
+  /* brand mark */
+  .chip{width:34px;height:34px;border-radius:10px;flex:none;position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;gap:2.6px;
+    background:linear-gradient(155deg,#2a2a33,#0a0a0e);border:1px solid rgba(255,255,255,.14);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 16px rgba(0,0,0,.5),0 0 20px rgba(255,255,255,.05)}
+  .chip::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.14),transparent 42%)}
+  .chip i{width:2.6px;border-radius:3px;transform-origin:center;background:linear-gradient(180deg,#fff,#c6c6cd);
+    box-shadow:0 0 7px var(--glow);animation:eq 1.5s ease-in-out infinite}
+  .chip i:nth-child(1){height:8px;animation-delay:0s}.chip i:nth-child(2){height:17px;animation-delay:.22s}
+  .chip i:nth-child(3){height:11px;animation-delay:.1s}.chip i:nth-child(4){height:6px;animation-delay:.34s}
+  @keyframes eq{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+  .wordmark{font:800 16px/1 var(--sans);text-transform:uppercase;letter-spacing:.15em;
+    background:var(--wm);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* nav */
+  nav.bar{position:sticky;top:0;z-index:10;border-bottom:1px solid var(--line);
+    background:rgba(8,8,10,.72);backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px)}
+  nav.bar .wrap{display:flex;align-items:center;gap:12px;height:64px;max-width:var(--maxw)}
+  nav.bar .brand{display:flex;align-items:center;gap:11px}
+  nav.bar .links{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .nlink{color:var(--muted);font-size:13.5px;padding:9px 13px;border-radius:9px}
+  .nlink:hover{color:var(--text);background:var(--surface-2)}
+
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);
+    display:flex;align-items:center;gap:10px;margin:0 0 20px;flex-wrap:wrap}
+  .eyebrow::before{content:"";width:20px;height:1px;background:var(--line-3)}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--hi);box-shadow:0 0 10px 1px var(--glow);animation:breathe 2.4s infinite}
+  @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+
+  /* hero */
+  header.hero .wrap{padding-top:76px;padding-bottom:20px}
+  h1{font-size:clamp(2.4rem,5.4vw,3.8rem);line-height:1.02;letter-spacing:-.03em;margin:0;font-weight:680;text-wrap:balance}
+  h1 .dim{color:var(--faint)}
+  .lede{font-size:clamp(1.08rem,1.7vw,1.3rem);color:var(--muted);max-width:52ch;margin:26px 0 0}
+  .lede b{color:var(--text);font-weight:600}
+
+  /* sections */
+  section{padding:64px 0 8px;position:relative;z-index:1}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin:0 0 14px;
+    display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:20px;height:1px;background:var(--line-3)}
+  h2{font-size:clamp(1.6rem,3vw,2.2rem);line-height:1.08;letter-spacing:-.025em;margin:0;font-weight:660;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:1.05rem;max-width:64ch;margin:16px 0 0}
+  p.body{color:var(--muted);font-size:1rem;max-width:64ch;margin:16px 0 0}
+  p.body b{color:var(--text);font-weight:600}
+
+  /* HUD card frame */
+  .card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    box-shadow:0 30px 70px -40px rgba(0,0,0,.9)}
+  .hud::before,.hud::after{content:"";position:absolute;width:10px;height:10px;border-color:var(--line-3);border-style:solid;pointer-events:none}
+  .hud::before{top:-1px;left:-1px;border-width:1px 0 0 1px}.hud::after{bottom:-1px;right:-1px;border-width:0 1px 1px 0}
+
+  /* pull-quote / north star */
+  .north{margin-top:34px;padding:30px 32px}
+  .north .q{font-size:clamp(1.3rem,2.6vw,1.9rem);line-height:1.25;letter-spacing:-.02em;font-weight:600;color:var(--text);text-wrap:balance}
+  .north .q .accent{background:var(--wm);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .north .attr{margin-top:14px;font-family:var(--mono);font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+
+  /* arc / timeline */
+  .arc{list-style:none;padding:0;margin:44px 0 0;display:grid;gap:0}
+  .arc li{display:grid;grid-template-columns:132px 1fr;gap:22px;padding:22px 0;border-top:1px solid var(--line);position:relative}
+  .arc li:last-child{border-bottom:1px solid var(--line)}
+  .arc .when{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding-top:3px}
+  .arc .when.now{color:var(--text)}
+  .arc .badge{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--ink);background:var(--hi);border-radius:999px;padding:3px 9px}
+  .arc h3{margin:0;font-size:1.12rem;letter-spacing:-.01em;font-weight:640}
+  .arc p{margin:6px 0 0;color:var(--muted);font-size:.96rem}
+
+  /* principles grid */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:44px}
+  .cell{padding:24px 24px}
+  .cell .n{font-family:var(--mono);font-size:.72rem;font-weight:600;color:var(--faint);letter-spacing:.1em}
+  .cell h3{font-size:1.08rem;margin:12px 0 8px;letter-spacing:-.01em}
+  .cell p{margin:0;color:var(--muted);font-size:.95rem;line-height:1.6}
+  .cell p b{color:var(--text);font-weight:600}
+
+  /* two-col prose blocks */
+  .split2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:40px}
+  .pane{padding:26px 26px}
+  .pane h3{margin:0 0 10px;font-size:1.1rem;letter-spacing:-.01em}
+  .pane p{margin:0;color:var(--muted);font-size:.95rem;line-height:1.6}
+  .pane p + p{margin-top:12px}
+  .pane ul{margin:12px 0 0;padding-left:0;list-style:none;display:grid;gap:10px}
+  .pane li{display:grid;grid-template-columns:16px 1fr;gap:11px;color:var(--muted);font-size:.94rem;align-items:start}
+  .pane .chk{color:var(--text);font-weight:700;line-height:1.3}
+
+  /* guardrail banner */
+  .guard{margin-top:44px;padding:28px 30px;display:grid;grid-template-columns:44px 1fr;gap:20px;align-items:start;
+    background:linear-gradient(180deg,rgba(255,255,255,.04),transparent);border:1px solid var(--line-2)}
+  .guard .lockicon{width:44px;height:44px;border-radius:12px;background:var(--surface-3);border:1px solid var(--line-2);
+    display:flex;align-items:center;justify-content:center;color:var(--text)}
+  .guard h3{margin:0 0 8px;font-size:1.12rem;letter-spacing:-.01em}
+  .guard p{margin:0;color:var(--muted);font-size:.98rem;line-height:1.6}
+  .guard p b{color:var(--text);font-weight:600}
+
+  .path{font-family:var(--mono);font-size:.86em;color:var(--muted)}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);margin-top:72px;padding:44px 0 60px;font-size:.9rem;color:var(--faint);position:relative;z-index:1}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:22px;align-items:center;justify-content:space-between}
+  footer a{color:var(--muted)}footer a:hover{color:var(--text)}
+  .foot-links{display:flex;gap:20px;flex-wrap:wrap}
+
+  @media (max-width:760px){
+    .grid,.split2{grid-template-columns:1fr}
+    .arc li{grid-template-columns:1fr;gap:6px}
+    .arc .when{padding-top:0}
+    .guard{grid-template-columns:1fr}
+    section{padding:48px 0 4px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .chip i,.eyebrow .dot{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<nav class="bar">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="chip"><i></i><i></i><i></i><i></i></span><span class="wordmark">freeflo</span></a>
+    <div class="links">
+      <a class="nlink" href="#arc">The arc</a>
+      <a class="nlink" href="#principles">Principles</a>
+      <a class="nlink" href="brand.html">Brand</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow"><span class="dot"></span>Vision · why we build</p>
+    <h1>Talk to your machine <span class="dim">the way you talk to a&nbsp;person.</span></h1>
+    <p class="lede">Speaking is the highest-bandwidth interface humans have. freeflo brings it to your devices — so you can <b>say what you want and get it done faster</b>. Voice-to-text is chapter one, not the whole book.</p>
+
+    <div class="card hud north">
+      <div class="q">Every interaction with your system should be <span class="accent">better than it was before</span> — and it should stay <span class="accent">yours</span>.</div>
+      <div class="attr">The north star</div>
+    </div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <p class="kicker">The problem</p>
+    <h2>We still translate what we <em>mean</em> into what the machine <em>accepts</em>.</h2>
+    <p class="sec-lede">Menus, windows, shortcuts, copy-paste, context switches. Talking to a person is instant and natural; talking to a computer is the opposite. That translation layer is where time and flow are lost. We want to erase it — no window to open, no app to switch to, no cloud round-trip. You say it; your machine does it.</p>
+  </div>
+</section>
+
+<section id="arc">
+  <div class="wrap">
+    <p class="kicker">The arc</p>
+    <h2>One interface, expanding across domains — and eventually across devices.</h2>
+    <p class="sec-lede">freeflo starts on the Mac with dictation because it's the most universal, immediate win. But each new domain is added the same way: by letting you speak instead of click.</p>
+
+    <ol class="arc">
+      <li>
+        <div class="when now">Today<span class="badge">shipping</span></div>
+        <div><h3>Say it → typed</h3><p>Hold a key, speak, and your words appear at the cursor in any app — transcribed entirely on your own machine.</p></div>
+      </li>
+      <li>
+        <div class="when">Next</div>
+        <div><h3>Manage your time by speaking</h3><p>Capture, schedule, and reshape your day out loud instead of navigating a calendar.</p></div>
+      </li>
+      <li>
+        <div class="when">Next</div>
+        <div><h3>Manage your work by speaking</h3><p>Tasks, notes, and context handled by voice — the busywork of organizing, spoken away.</p></div>
+      </li>
+      <li>
+        <div class="when">Then</div>
+        <div><h3>Drive your machine by speaking</h3><p>Control the laptop itself, not just fill text fields. Make working on your system easier, end to end.</p></div>
+      </li>
+      <li>
+        <div class="when">Then</div>
+        <div><h3>Work better with LLMs</h3><p>Talk to models with the same privacy guarantees as everything else freeflo does.</p></div>
+      </li>
+      <li>
+        <div class="when">Horizon</div>
+        <div><h3>Beyond the Mac</h3><p>The same natural interface across every device you own.</p></div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="principles">
+  <div class="wrap">
+    <p class="kicker">What we believe</p>
+    <h2>Six principles that constrain the roadmap, the architecture, and the business.</h2>
+
+    <div class="grid">
+      <div class="card hud cell">
+        <span class="n">01</span>
+        <h3>On-device first</h3>
+        <p>Everything that can run locally, runs locally. That buys two things at once: <b>low latency</b> — no network round-trip — and <b>data ownership</b>.</p>
+      </div>
+      <div class="card hud cell">
+        <span class="n">02</span>
+        <h3>You own your data</h3>
+        <p>What you say and dictate is yours. <b>Transcribed text and audio never leave the device</b> — enforced by architecture, not a policy promise. Telemetry is metadata only, consented, and switchable off.</p>
+      </div>
+      <div class="card hud cell">
+        <span class="n">03</span>
+        <h3>Free — or a small one-time price</h3>
+        <p>No subscriptions, no word limits, no rent on your own voice. On-device compute means no server bill to pass on to you. If we ever charge, it's a <b>minimal one-time price for a capability</b> — never a meter.</p>
+      </div>
+      <div class="card hud cell">
+        <span class="n">04</span>
+        <h3>Built for people who live in their systems</h3>
+        <p>Our users are professionals — many technical. We build a <b>serious tool</b> for people who work all day on their machines. The bar is "indispensable," not "fun to try once."</p>
+      </div>
+      <div class="card hud cell">
+        <span class="n">05</span>
+        <h3>Evolves with its users</h3>
+        <p>Not a one-feature company that ships a gimmick and vanishes. The in-app <b>feature request</b> channel exists so we hear what users need and evolve the product <em>with</em> them.</p>
+      </div>
+      <div class="card hud cell">
+        <span class="n">06</span>
+        <h3>Privacy is the design language, too</h3>
+        <p>Neutral, precise, futuristic, permanent-feeling. How freeflo looks signals what it is: a <b>serious, private, on-device tool you can trust</b> — not a disposable app.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="business">
+  <div class="wrap">
+    <p class="kicker">Business &amp; design</p>
+    <h2>Why the economics and the look both point the same way.</h2>
+
+    <div class="split2">
+      <div class="card hud pane">
+        <h3>The economics make the promise sustainable</h3>
+        <p>On-device compute means near-zero marginal cost per user — which is <em>what makes</em> "free / minimal one-time price" real, not a loss-leader promise.</p>
+        <ul>
+          <li><span class="chk">→</span><div><b>No backend today.</b> On-device plus managed free services — updates via GitHub Releases, consented analytics on managed tiers.</div></li>
+          <li><span class="chk">→</span><div><b>Add a backend only on a concrete trigger</b> — owning our data end-to-end, server-side logic, or hosted LLM features. Never by default.</div></li>
+          <li><span class="chk">→</span><div><b>The moat is trust + depth</b> across domains, compounding as we listen and expand.</div></li>
+        </ul>
+      </div>
+      <div class="card hud pane">
+        <h3>The look says "serious and permanent"</h3>
+        <p>The brand is deliberately neutral and monochrome: a living waveform chip, a chromed uppercase wordmark, hairline structure, HUD/terminal precision cues (lockup <b>A+1</b>).</p>
+        <p>We chose it because freeflo is a trust product — it handles your voice and your data on your own machine. The visual language has to say <b>"serious tool that will endure,"</b> not "fun feature that will vanish."</p>
+        <p>See <a href="brand.html" style="color:var(--text);border-bottom:1px solid var(--line-3)">the brand system</a>, <a href="onboarding.html" style="color:var(--text);border-bottom:1px solid var(--line-3)">onboarding</a>, and <a href="app-window.html" style="color:var(--text);border-bottom:1px solid var(--line-3)">the app window</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="guardrail">
+  <div class="wrap">
+    <p class="kicker">The line we never cross</p>
+    <div class="card hud guard">
+      <div class="lockicon">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      </div>
+      <div>
+        <h3>Your words never leave your machine.</h3>
+        <p>Transcribed text and audio <b>never</b> leave the device. Telemetry is metadata + profile only, and always consented. If a future feature can't honor this, it either runs on-device — or it doesn't ship without explicit, informed, opt-in consent.</p>
+      </div>
+    </div>
+
+    <p class="body">The concrete, phased build plan lives in <span class="path">.context/build-plan.md</span>; the written companion to this page is <span class="path">VISION.md</span>. This page is the <em>why</em>; those are the <em>what &amp; when</em>.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="brand" style="display:flex;align-items:center;gap:10px"><span class="chip"><i></i><i></i><i></i><i></i></span><span class="wordmark">freeflo</span></div>
+      <div style="margin-top:10px">Talk to your machine · On-device · You own your data</div>
+    </div>
+    <nav class="foot-links">
+      <a href="https://github.com/rachitgupta6720/freeflo">GitHub</a>
+      <a href="../VISION.md">VISION.md</a>
+      <a href="brand.html">Brand</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
