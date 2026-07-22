@@ -91,10 +91,11 @@ OPTIONS = {
         'cryptography',       # pulled in by google.auth.crypt (compiled ext)
         'keyring',
         'keyring.backends',   # ensure the macOS Keychain backend is bundled
-        # Opt-in telemetry (engine.telemetry). Bundled regardless of keys; inert
-        # without a telemetry.json / env vars, and gated on user consent.
+        # Opt-in telemetry (engine.telemetry) via PostHog — analytics, identity,
+        # AND crash/error tracking. Bundled regardless of keys; inert without a
+        # telemetry.json / env vars, and gated on user consent. (Sentry is an
+        # optional extra the code supports but we don't ship it.)
         'posthog',
-        'sentry_sdk',
     ],
     'includes': [
         'config',

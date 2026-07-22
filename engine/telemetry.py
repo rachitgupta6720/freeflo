@@ -55,9 +55,13 @@ def init():
             posthog.host = keys.get('posthog_host') or 'https://us.i.posthog.com'
             _ph = posthog
             atexit.register(flush)
+            # PostHog handles crashes too (Error Tracking) — no separate service.
+            logs.add_exception_listener(_on_exception)
         except Exception as e:
             log.warning('PostHog init failed: %s', e)
 
+    # Sentry is fully optional: only if a DSN is configured AND the SDK is
+    # installed. We ship PostHog-only, so this path normally stays dormant.
     if keys.get('sentry_dsn'):
         try:
             import sentry_sdk
@@ -70,12 +74,12 @@ def init():
             )
             sentry_sdk.set_user({'id': _distinct_id})
             _sentry_on = True
-            logs.add_exception_listener(_on_exception)
         except Exception as e:
             log.warning('Sentry init failed: %s', e)
 
     if _ph or _sentry_on:
-        log.info('telemetry ready (analytics=%s crashes=%s)', bool(_ph), _sentry_on)
+        log.info('telemetry ready (analytics=%s crashes=%s)',
+                 bool(_ph), bool(_ph) or _sentry_on)
     identify()
     capture('app_launched')
 
@@ -88,13 +92,29 @@ def _before_send(event, hint):
 
 
 def _on_exception(exc_type, exc_value, exc_tb):
-    if not _sentry_on:
+    """Report an uncaught exception — via PostHog Error Tracking (primary) and
+    Sentry if it happens to be configured. Gated live on crash consent; never
+    includes transcription text."""
+    if not config.load().get('crash_enabled', True):
         return
-    try:
-        import sentry_sdk
-        sentry_sdk.capture_exception(exc_value)
-    except Exception:
-        pass
+    if _ph is not None:
+        try:
+            if hasattr(_ph, 'capture_exception'):
+                _ph.capture_exception(exc_value, distinct_id=_distinct_id)
+            else:  # older SDK: send a manual $exception event
+                _ph.capture(_distinct_id, '$exception', {
+                    '$exception_type': getattr(exc_type, '__name__', 'Error'),
+                    '$exception_message': str(exc_value),
+                    'app_version': config.get_version(),
+                })
+        except Exception:
+            pass
+    if _sentry_on:
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc_value)
+        except Exception:
+            pass
 
 
 def identify():

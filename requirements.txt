@@ -18,9 +18,9 @@ cryptography>=42.0
 cachetools>=5.0
 rsa>=4.9
 
-# Opt-in, consent-gated telemetry (engine/telemetry.py) — inert without keys
-posthog>=3.0,<4                     # anonymous usage analytics + identity
-sentry-sdk>=2.0                     # crash reporting
+# Opt-in, consent-gated telemetry (engine/telemetry.py) — inert without keys.
+# PostHog covers analytics, identity, AND crash/error tracking (one service).
+posthog>=3.0,<4
 
 # PyObjC bridges (pull in pyobjc-core automatically)
 pyobjc-framework-Cocoa>=10.0
