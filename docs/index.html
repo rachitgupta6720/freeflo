@@ -4,215 +4,287 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>freeflo — Offline dictation for your Mac</title>
-<meta name="description" content="Hold a key, speak, and your words are typed anywhere on your Mac. Fully offline, private, and free. Powered by whisper.cpp.">
+<meta name="description" content="Hold a key, speak, and your words are typed anywhere on your Mac. Transcription runs on-device — your words never leave your machine. Free, powered by whisper.cpp.">
 <style>
   :root{
-    --ink:#14161B; --ink-soft:#1C1F26; --paper:#F5F6F8; --card:#FFFFFF;
-    --red:#FF4B3E; --red-deep:#E23A2E; --teal:#0C6E6A;
-    --text:#1A1D23; --muted:#5C626C; --muted-dark:#9AA1AC;
-    --line:#E4E7EC; --line-dark:rgba(255,255,255,.10);
+    --bg:#08080a; --bg-2:#0c0c0f; --surface:#111116; --surface-2:#17171c; --surface-3:#1e1e24;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12); --line-3:rgba(255,255,255,.20);
+    --text:#f5f5f6; --muted:#a0a0a8; --faint:#6b6b74;
+    --hi:#ffffff; --ink:#0a0a0c; --glow:rgba(255,255,255,.18);
+    --wm:linear-gradient(180deg,#fff 0%,#d4d4da 46%,#f6f6f8 56%,#9a9aa3 100%);
     --maxw:1080px;
-    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
-    --mono:ui-monospace,"SF Mono","SFMono-Regular",Menlo,Monaco,"Cascadia Code",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Monaco,monospace;
+    color-scheme:dark;
   }
   *{box-sizing:border-box}
   html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-  body{margin:0;font-family:var(--sans);color:var(--text);background:var(--paper);line-height:1.6}
-  a{color:inherit}
-  img{max-width:100%}
+  html,body{overflow-x:hidden;max-width:100%}
+  body{margin:0;font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.6;position:relative}
+  a{color:inherit;text-decoration:none}
+  img,canvas,svg{max-width:100%}
   .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 
-  /* hero */
-  .hero{background:var(--ink);color:#F3F5F8;position:relative;overflow:hidden}
-  .hero::after{content:"";position:absolute;inset:0;pointer-events:none;
-    background:radial-gradient(120% 90% at 82% -10%,rgba(255,75,62,.16),transparent 46%),
-               radial-gradient(80% 70% at -5% 110%,rgba(12,110,106,.20),transparent 55%);}
-  .hero .wrap{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;
-    gap:56px;align-items:center;padding-top:84px;padding-bottom:96px}
-  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--muted-dark);display:flex;align-items:center;gap:9px;margin:0 0 22px}
-  .eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--red);
-    box-shadow:0 0 0 0 rgba(255,75,62,.55);animation:pulse 2s infinite}
-  h1{font-size:clamp(2.7rem,6.2vw,4.5rem);line-height:.98;letter-spacing:-.03em;margin:0;
-    font-weight:700;text-wrap:balance}
-  h1 .flow{font-weight:300;font-style:italic;color:#fff}
-  .lede{font-size:clamp(1.05rem,1.7vw,1.28rem);color:#C6CBD3;max-width:30ch;margin:26px 0 34px;font-weight:400}
+  /* ambient backdrop: grid + drifting glow */
+  body::before{content:"";position:fixed;inset:0;z-index:-3;
+    background:
+      radial-gradient(820px 560px at 82% -8%, rgba(255,255,255,.06), transparent 55%),
+      radial-gradient(700px 560px at 8% 108%, rgba(255,255,255,.04), transparent 55%),
+      var(--bg);}
+  body::after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background-image:linear-gradient(to right,var(--line) 1px,transparent 1px),
+                     linear-gradient(to bottom,var(--line) 1px,transparent 1px);
+    background-size:46px 46px;
+    -webkit-mask-image:radial-gradient(1200px 820px at 50% 0%,#000 38%,transparent 82%);
+            mask-image:radial-gradient(1200px 820px at 50% 0%,#000 38%,transparent 82%);opacity:.5;}
+
+  /* brand mark */
+  .chip{width:34px;height:34px;border-radius:10px;flex:none;position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;gap:2.6px;
+    background:linear-gradient(155deg,#2a2a33,#0a0a0e);border:1px solid rgba(255,255,255,.14);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 4px 16px rgba(0,0,0,.5),0 0 20px rgba(255,255,255,.05)}
+  .chip::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.14),transparent 42%)}
+  .chip i{width:2.6px;border-radius:3px;transform-origin:center;background:linear-gradient(180deg,#fff,#c6c6cd);
+    box-shadow:0 0 7px var(--glow);animation:eq 1.5s ease-in-out infinite}
+  .chip i:nth-child(1){height:8px;animation-delay:0s}.chip i:nth-child(2){height:17px;animation-delay:.22s}
+  .chip i:nth-child(3){height:11px;animation-delay:.1s}.chip i:nth-child(4){height:6px;animation-delay:.34s}
+  @keyframes eq{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+  .wordmark{font:800 16px/1 var(--sans);text-transform:uppercase;letter-spacing:.15em;
+    background:var(--wm);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* nav */
+  nav.bar{position:sticky;top:0;z-index:10;border-bottom:1px solid var(--line);
+    background:rgba(8,8,10,.72);backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px)}
+  nav.bar .wrap{display:flex;align-items:center;gap:12px;height:64px}
+  nav.bar .brand{display:flex;align-items:center;gap:11px}
+  nav.bar .links{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .nlink{color:var(--muted);font-size:13.5px;padding:9px 13px;border-radius:9px}
+  .nlink:hover{color:var(--text);background:var(--surface-2)}
+
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);
+    display:flex;align-items:center;gap:10px;margin:0 0 20px;flex-wrap:wrap}
+  .eyebrow::before{content:"";width:20px;height:1px;background:var(--line-3)}
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--hi);box-shadow:0 0 10px 1px var(--glow);animation:breathe 2.4s infinite}
+  @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+
+  h1{font-size:clamp(2.6rem,6vw,4.4rem);line-height:1;letter-spacing:-.03em;margin:0;font-weight:680;text-wrap:balance}
+  h1 .dim{color:var(--faint)}
+  .lede{font-size:clamp(1.05rem,1.7vw,1.25rem);color:var(--muted);max-width:34ch;margin:24px 0 32px}
+
+  .btn{display:inline-flex;align-items:center;gap:10px;font-family:var(--sans);font-size:.98rem;font-weight:640;
+    padding:14px 22px;border-radius:11px;border:1px solid var(--line-2);transition:all .15s ease;cursor:pointer}
+  .btn-primary{background:var(--hi);color:var(--ink);border-color:var(--hi);box-shadow:0 8px 30px var(--glow)}
+  .btn-primary:hover{box-shadow:0 10px 40px rgba(255,255,255,.28);transform:translateY(-1px)}
+  .btn-primary .sz{font-family:var(--mono);font-size:.72rem;font-weight:500;opacity:.7;
+    padding-left:10px;margin-left:2px;border-left:1px solid rgba(0,0,0,.25)}
+  .btn-ghost{background:transparent;color:var(--text)}
+  .btn-ghost:hover{border-color:var(--line-3);transform:translateY(-1px)}
   .cta-row{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
-  .btn{display:inline-flex;align-items:center;gap:10px;font-family:var(--sans);font-size:1rem;
-    font-weight:600;padding:15px 24px;border-radius:12px;text-decoration:none;border:1px solid transparent;
-    transition:transform .12s ease,background .15s ease,border-color .15s ease;cursor:pointer}
-  .btn-primary{background:var(--red);color:#fff;box-shadow:0 8px 30px -10px rgba(255,75,62,.7)}
-  .btn-primary:hover{background:var(--red-deep);transform:translateY(-1px)}
-  .btn-primary .sz{font-family:var(--mono);font-size:.72rem;font-weight:500;opacity:.85;
-    padding-left:10px;margin-left:2px;border-left:1px solid rgba(255,255,255,.35)}
-  .btn-ghost{background:transparent;color:#EDEFF2;border-color:rgba(255,255,255,.22)}
-  .btn-ghost:hover{border-color:rgba(255,255,255,.5);transform:translateY(-1px)}
-  .hero-note{margin:20px 0 0;font-size:.86rem;color:var(--muted-dark)}
-  .hero-note b{color:#D7DBE1;font-weight:600}
+  .hero-note{margin:20px 0 0;font-size:.86rem;color:var(--faint)}
+  .hero-note b{color:var(--muted);font-weight:600}
+
+  /* hero */
+  header.hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;
+    padding-top:80px;padding-bottom:92px;position:relative;z-index:1}
 
   /* demo card */
-  .demo{background:linear-gradient(180deg,#20242C,#181B21);border:1px solid rgba(255,255,255,.08);
-    border-radius:18px;padding:20px;box-shadow:0 40px 80px -40px rgba(0,0,0,.9);}
-  .demo-top{display:flex;align-items:center;gap:7px;margin-bottom:16px}
-  .demo-top i{width:11px;height:11px;border-radius:50%;display:inline-block;background:#3a3f48}
-  .demo-top i:nth-child(1){background:#ff5f57}.demo-top i:nth-child(2){background:#febc2e}
-  .demo-top i:nth-child(3){background:#28c840}
-  .demo-top span{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted-dark)}
-  .field{background:#0E1116;border:1px solid rgba(255,255,255,.07);border-radius:11px;
-    min-height:118px;padding:16px 18px;font-size:1.12rem;line-height:1.5;color:#EDEFF2}
-  .field .label{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
-    color:var(--muted-dark);display:block;margin-bottom:10px}
-  #typed{font-weight:420}
-  .caret{display:inline-block;width:2px;height:1.05em;background:var(--red);margin-left:1px;
-    transform:translateY(3px);animation:blink 1s steps(1) infinite}
-  .demo-foot{display:flex;align-items:center;gap:14px;margin-top:16px}
-  .rec{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#C6CBD3;font-weight:500}
-  .rec .rdot{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulse 2s infinite}
-  canvas#wave{flex:1;height:26px;opacity:.9}
-  .kbd{font-family:var(--mono);font-size:.72rem;color:#C6CBD3;background:rgba(255,255,255,.07);
-    border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;border-radius:7px;padding:5px 9px;white-space:nowrap}
+  .card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    box-shadow:0 30px 70px -40px rgba(0,0,0,.9)}
+  .hud::before,.hud::after{content:"";position:absolute;width:10px;height:10px;border-color:var(--line-3);border-style:solid;pointer-events:none}
+  .hud::before{top:-1px;left:-1px;border-width:1px 0 0 1px}.hud::after{bottom:-1px;right:-1px;border-width:0 1px 1px 0}
+  .demo{padding:18px}
+  .demo-top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .demo-top i{width:10px;height:10px;border-radius:50%;background:var(--surface-3);border:1px solid var(--line-2)}
+  .demo-top span{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .field{background:var(--bg-2);border:1px solid var(--line);border-radius:11px;min-height:120px;padding:16px 18px;
+    font-size:1.1rem;line-height:1.5;color:var(--text)}
+  .field .label{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:10px}
+  .caret{display:inline-block;width:2px;height:1.05em;background:var(--hi);margin-left:1px;transform:translateY(3px);
+    box-shadow:0 0 8px var(--glow);animation:blink 1s steps(1) infinite}
+  .demo-foot{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+  .rec{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--muted);font-weight:500}
+  .rec .rdot{width:9px;height:9px;border-radius:50%;background:var(--hi);box-shadow:0 0 9px var(--glow);animation:breathe 1.6s infinite}
+  canvas#wave{flex:1 1 120px;min-width:0;width:100%;height:26px;opacity:.9}
+  .kbd{font-family:var(--mono);font-size:.72rem;color:var(--muted);background:var(--surface-3);
+    border:1px solid var(--line-2);border-radius:7px;padding:5px 9px;white-space:nowrap}
 
-  /* generic section */
-  section{padding:88px 0}
-  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.15em;text-transform:uppercase;
-    color:var(--teal);margin:0 0 14px;font-weight:600}
-  h2{font-size:clamp(1.8rem,3.4vw,2.6rem);line-height:1.05;letter-spacing:-.025em;margin:0;
-    font-weight:700;text-wrap:balance}
-  .sec-lede{color:var(--muted);font-size:1.1rem;max-width:54ch;margin:16px 0 0}
+  /* sections */
+  section{padding:84px 0;position:relative;z-index:1}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+  h2{font-size:clamp(1.7rem,3.2vw,2.4rem);line-height:1.06;letter-spacing:-.025em;margin:0;font-weight:660;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:1.05rem;max-width:56ch;margin:16px 0 0}
 
   /* steps */
-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:52px}
-  .step{position:relative;padding-top:26px;border-top:2px solid var(--ink)}
-  .step .n{font-family:var(--mono);font-size:.78rem;font-weight:600;color:var(--red);letter-spacing:.05em}
-  .step h3{font-size:1.22rem;margin:14px 0 8px;letter-spacing:-.01em}
-  .step p{color:var(--muted);margin:0;font-size:.98rem}
-  .step .key{font-family:var(--mono);color:var(--text);background:#fff;border:1px solid var(--line);
-    border-bottom-width:2px;border-radius:6px;padding:2px 7px;font-size:.85em}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+  .step{padding-top:22px;border-top:1px solid var(--line-3)}
+  .step .n{font-family:var(--mono);font-size:.74rem;font-weight:600;color:var(--muted);letter-spacing:.08em}
+  .step h3{font-size:1.16rem;margin:14px 0 8px;letter-spacing:-.01em}
+  .step p{color:var(--muted);margin:0;font-size:.96rem}
+  .step .key{font-family:var(--mono);color:var(--text);background:var(--surface-3);border:1px solid var(--line-2);border-radius:6px;padding:2px 7px;font-size:.85em}
 
   /* features */
-  .features{background:var(--ink);color:#EDEFF2}
-  .features h2{color:#fff}.features .kicker{color:#7FD9D3}.features .sec-lede{color:var(--muted-dark)}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:52px;
-    background:var(--line-dark);border:1px solid var(--line-dark);border-radius:16px;overflow:hidden}
-  .cell{background:var(--ink-soft);padding:30px 28px}
-  .cell .ic{font-size:1.5rem;margin-bottom:16px;display:block;line-height:1}
-  .cell h3{font-size:1.12rem;margin:0 0 8px;color:#fff;letter-spacing:-.01em}
-  .cell p{margin:0;color:var(--muted-dark);font-size:.95rem;line-height:1.55}
-  .cell .tag{color:var(--teal);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:48px}
+  .cell{padding:24px 22px}
+  .cell .ic{width:22px;height:22px;color:var(--text);margin-bottom:14px;display:block}
+  .cell h3{font-size:1.08rem;margin:0 0 6px;letter-spacing:-.01em}
+  .cell .tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.05em;color:var(--faint);text-transform:uppercase}
+  .cell p{margin:0;color:var(--muted);font-size:.93rem;line-height:1.55}
+
+  /* privacy — a single centered statement */
+  .privacy .wrap{max-width:680px;margin:0 auto;text-align:center}
+  .privacy .lock{width:34px;height:34px;color:var(--text);margin:0 auto 18px;display:block}
+  .privacy h2{margin:0 auto}
+  .privacy .sec-lede{margin:16px auto 0}
+  .privacy .chips-row{justify-content:center}
+  .path{font-family:var(--mono);font-size:.88em;color:var(--muted)}
 
   /* download */
-  .dl{background:var(--paper)}
   .dl-head{display:grid;grid-template-columns:1fr auto;gap:40px;align-items:end}
-  .req{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
-  .req span{font-family:var(--mono);font-size:.78rem;color:var(--muted);background:#fff;
-    border:1px solid var(--line);border-radius:999px;padding:7px 13px}
-  .ver{margin:18px 0 0;font-family:var(--mono);font-size:.82rem;color:var(--muted)}
+  .req{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .req span{font-family:var(--mono);font-size:.76rem;color:var(--muted);background:var(--surface);border:1px solid var(--line-2);border-radius:999px;padding:7px 13px}
+  .ver{margin:16px 0 0;font-family:var(--mono);font-size:.82rem;color:var(--faint)}
   .ver b{color:var(--text);font-weight:600}
-  .ver a{color:var(--teal);text-decoration:none;border-bottom:1px solid transparent}
-  .ver a:hover{border-bottom-color:var(--teal)}
-  .install{margin-top:48px;background:var(--card);border:1px solid var(--line);border-radius:18px;
-    padding:12px 12px;box-shadow:0 30px 60px -45px rgba(20,30,50,.4)}
-  .istep{display:grid;grid-template-columns:44px 1fr;gap:18px;padding:22px 24px;align-items:start}
+  .ver a{color:var(--muted);border-bottom:1px solid transparent}.ver a:hover{border-bottom-color:var(--muted)}
+  .install{margin-top:40px;overflow:hidden}
+  .istep{display:grid;grid-template-columns:40px 1fr;gap:18px;padding:22px 24px;align-items:start}
   .istep + .istep{border-top:1px solid var(--line)}
-  .istep .num{width:34px;height:34px;border-radius:9px;background:var(--ink);color:#fff;
-    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem;
-    font-variant-numeric:tabular-nums}
-  .istep h3{margin:4px 0 6px;font-size:1.08rem;letter-spacing:-.01em}
-  .istep p{margin:0;color:var(--muted);font-size:.97rem}
-  .istep p + p{margin-top:8px}
-  .istep code{font-family:var(--mono);font-size:.85em;background:var(--paper);border:1px solid var(--line);
-    border-radius:6px;padding:2px 7px}
-  .path{font-family:var(--mono);font-size:.85em;color:var(--teal)}
-  .callout{margin-top:28px;display:flex;gap:14px;align-items:flex-start;background:rgba(12,110,106,.07);
-    border:1px solid rgba(12,110,106,.22);border-radius:12px;padding:18px 20px;color:#0B4C49;font-size:.94rem}
-  .callout b{color:var(--teal)}
-  .stuck{margin-top:16px;font-size:.9rem;color:var(--muted)}
-  .stuck code{font-family:var(--mono);font-size:.88em;background:#fff;border:1px solid var(--line);
-    border-radius:6px;padding:2px 7px;color:var(--text)}
+  .istep .num{width:32px;height:32px;border-radius:9px;background:var(--surface-3);border:1px solid var(--line-2);color:var(--text);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:.9rem}
+  .istep h3{margin:3px 0 6px;font-size:1.04rem;letter-spacing:-.01em}
+  .istep p{margin:0;color:var(--muted);font-size:.95rem}.istep p + p{margin-top:8px}
+  .istep code{font-family:var(--mono);font-size:.85em;background:var(--bg-2);border:1px solid var(--line-2);border-radius:6px;padding:2px 7px}
+  .callout{margin-top:24px;display:flex;gap:12px;align-items:flex-start;background:linear-gradient(180deg,rgba(255,255,255,.04),transparent);
+    border:1px solid var(--line);border-radius:12px;padding:16px 18px;color:var(--muted);font-size:.92rem}
+  .callout b{color:var(--text)}
+  .stuck{margin-top:16px;font-size:.88rem;color:var(--faint)}
+  .stuck code{font-family:var(--mono);font-size:.88em;background:var(--surface);border:1px solid var(--line-2);border-radius:6px;padding:2px 7px;color:var(--muted)}
+
+  /* visual flow: hold -> speak -> typed */
+  .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:44px}
+  .moment{padding:32px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .moment .big{height:58px;display:flex;align-items:center;justify-content:center;color:var(--text)}
+  .moment .big kbd{font-size:1.5rem;padding:14px 18px}
+  .moment .big svg{width:34px;height:34px}
+  .moment .bars{display:flex;align-items:center;gap:4px;height:40px}
+  .moment .bars span{width:4px;border-radius:3px;background:var(--hi);box-shadow:0 0 8px var(--glow);animation:eq 1.1s ease-in-out infinite}
+  .moment .bars span:nth-child(1){height:14px;animation-delay:0s}.moment .bars span:nth-child(2){height:34px;animation-delay:.15s}
+  .moment .bars span:nth-child(3){height:22px;animation-delay:.3s}.moment .bars span:nth-child(4){height:38px;animation-delay:.1s}
+  .moment .bars span:nth-child(5){height:16px;animation-delay:.4s}
+  .moment .step-n{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;color:var(--faint)}
+  .moment h3{font-size:1.12rem;margin:0;letter-spacing:-.01em}
+
+  /* chip row (privacy) */
+  .chips-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .chips-row span{font-family:var(--mono);font-size:.78rem;color:var(--muted);background:var(--surface);
+    border:1px solid var(--line-2);border-radius:999px;padding:9px 15px}
+  .chips-row span b{color:var(--text);font-weight:600}
+
+  /* compatibility banner (hero) */
+  .compat{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:20px 0 0;padding:13px 15px;
+    border:1px solid var(--line-2);border-radius:11px;background:var(--surface);font-size:.84rem;color:var(--muted)}
+  .compat .warn{display:inline-flex;align-items:center;gap:8px;color:var(--text);font-weight:640}
+  .compat .warn svg{width:16px;height:16px;flex:none}
+  .compat .sep{width:1px;height:14px;background:var(--line-3);display:inline-block}
+
+  /* run-it section (2nd fold) — the one-time Terminal step, made prominent */
+  .run{padding-top:0}
+  .runcard{padding:28px}
+  .run h2{font-size:clamp(1.5rem,3vw,2rem)}
+  .run .lede2{color:var(--muted);max-width:62ch;margin:12px 0 22px;font-size:1rem}
+  .run .lede2 b{color:var(--text);font-weight:600}
+  .steps-mini{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;font-family:var(--mono);font-size:.78rem;color:var(--faint)}
+  .steps-mini span{background:var(--bg-2);border:1px solid var(--line-2);border-radius:999px;padding:6px 12px}
+  .steps-mini b{color:var(--text);font-weight:600}
+  .cmd{display:flex;align-items:stretch;border:1px solid var(--line-3);border-radius:12px;overflow:hidden;background:var(--bg-2)}
+  .cmd .code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;
+    font-family:var(--mono);font-size:1.02rem;color:var(--text);padding:17px 18px;display:flex;align-items:center;gap:10px}
+  .cmd .code .pr{color:var(--faint);-webkit-user-select:none;user-select:none}
+  .copy-btn{flex:none;border:none;border-left:1px solid var(--line-3);background:var(--hi);color:var(--ink);
+    font:640 .95rem var(--sans);padding:0 22px;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:56px}
+  .copy-btn:active{transform:translateY(1px)}
+  .copy-btn.done{background:var(--surface-3);color:var(--text)}
+  .run-note{margin:14px 0 0;font-size:.86rem;color:var(--faint)}
+
+  .mobile-hint{display:none}
 
   /* footer */
-  footer{background:var(--ink);color:var(--muted-dark);padding:56px 0 64px;font-size:.92rem}
-  footer .wrap{display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between}
-  footer a{color:#C6CBD3;text-decoration:none;border-bottom:1px solid transparent}
-  footer a:hover{border-bottom-color:var(--red)}
-  .brand{font-weight:700;color:#fff;font-size:1.05rem;letter-spacing:-.01em}
-  .foot-links{display:flex;gap:22px;flex-wrap:wrap}
+  footer{border-top:1px solid var(--line);padding:48px 0 60px;font-size:.9rem;color:var(--faint);position:relative;z-index:1}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:22px;align-items:center;justify-content:space-between}
+  footer a{color:var(--muted)}footer a:hover{color:var(--text)}
+  .foot-links{display:flex;gap:20px;flex-wrap:wrap}
 
-  /* privacy */
-  .privacy{background:var(--paper)}
-  .privacy .wrap{display:grid;grid-template-columns:.92fr 1.08fr;gap:56px;align-items:center}
-  .privacy .lock{font-size:2rem;margin:0 0 16px;display:block;line-height:1}
-  .privacy h2{max-width:15ch}
-  .priv-points{list-style:none;padding:0;margin:0;display:grid;gap:20px}
-  .priv-points li{display:grid;grid-template-columns:26px 1fr;gap:14px;align-items:start}
-  .priv-points .chk{color:var(--teal);font-weight:700;font-size:1.05rem;line-height:1.35}
-  .priv-points b{display:block;font-size:1.05rem;margin-bottom:3px;color:var(--text)}
-  .priv-points p{color:var(--muted);font-size:.96rem;margin:0}
-  .priv-points .path{white-space:nowrap}
-
-  /* compare */
-  .compare{background:var(--ink);color:#EDEFF2}
-  .compare h2{color:#fff}.compare .kicker{color:#7FD9D3}.compare .sec-lede{color:var(--muted-dark)}
-  .price-band{display:flex;flex-wrap:wrap;gap:18px;margin-top:44px}
-  .pcard{flex:1;min-width:230px;border-radius:16px;padding:26px 28px;border:1px solid var(--line-dark);background:var(--ink-soft)}
-  .pcard.free{background:linear-gradient(180deg,rgba(255,75,62,.16),rgba(255,75,62,.03));border-color:rgba(255,75,62,.45)}
-  .pcard .who{font-family:var(--mono);font-size:.76rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-dark)}
-  .pcard .amt{font-size:2.5rem;font-weight:700;letter-spacing:-.03em;margin:10px 0 4px;color:#fff}
-  .pcard.free .amt{color:var(--red)}
-  .pcard .sub{color:var(--muted-dark);font-size:.9rem}
-  .table-wrap{overflow-x:auto;margin-top:32px;border:1px solid var(--line-dark);border-radius:16px}
-  table.cmp{width:100%;border-collapse:collapse;min-width:540px}
-  table.cmp th,table.cmp td{padding:15px 20px;text-align:left;border-bottom:1px solid var(--line-dark);font-size:.95rem;vertical-align:top}
-  table.cmp thead th{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-dark);font-weight:600}
-  table.cmp thead th.ff{color:var(--red)}
-  table.cmp tbody th{font-weight:500;color:#B7BDC6}
-  table.cmp td.ff{color:#fff;font-weight:600;background:rgba(255,75,62,.06)}
-  table.cmp td.other{color:var(--muted-dark)}
-  table.cmp tr:last-child td,table.cmp tr:last-child th{border-bottom:none}
-  .yes{color:#37D39B;font-weight:700}.no{color:#8C929C;font-weight:700}
-  .cmp-note{margin-top:16px;font-size:.82rem;color:var(--muted-dark);max-width:70ch}
-
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,75,62,.5)}70%{box-shadow:0 0 0 9px rgba(255,75,62,0)}100%{box-shadow:0 0 0 0 rgba(255,75,62,0)}}
   @keyframes blink{50%{opacity:0}}
-
   @media (max-width:860px){
-    .hero .wrap{grid-template-columns:1fr;gap:40px;padding-top:56px;padding-bottom:64px}
+    header.hero .wrap{grid-template-columns:1fr;gap:36px;padding-top:44px;padding-bottom:52px}
     .lede{max-width:none}
     .steps{grid-template-columns:1fr}
     .grid{grid-template-columns:1fr 1fr}
     .dl-head{grid-template-columns:1fr}
-    .privacy .wrap{grid-template-columns:1fr;gap:32px}
-    section{padding:64px 0}
+    .privacy .wrap{grid-template-columns:1fr;gap:28px}
+    section{padding:56px 0}
+    nav.bar .nlink.hide{display:none}
   }
-  @media (max-width:540px){
+  @media (max-width:560px){
+    .wrap{padding:0 18px}
+    h1{font-size:clamp(2.2rem,10vw,3rem)}
     .grid{grid-template-columns:1fr}
-    .istep{grid-template-columns:1fr;gap:10px}
+    .cta-row{flex-direction:column;align-items:stretch}
+    .cta-row .btn{justify-content:center;width:100%;padding:16px 20px}
+    .runcard{padding:22px 18px}
+    .cmd{flex-direction:column}
+    .cmd .code{font-size:.92rem;padding:15px 16px}
+    .copy-btn{border-left:none;border-top:1px solid var(--line-3);justify-content:center;padding:15px;width:100%}
+    .istep{grid-template-columns:34px 1fr;gap:14px;padding:18px 18px}
+    .mobile-hint{display:flex}
+    .compat{flex-direction:column;align-items:flex-start;gap:8px}
+    .compat .sep{display:none}
+    .steps-mini{width:100%}
+    nav.bar .wrap{height:58px}
   }
   @media (prefers-reduced-motion:reduce){
-    .eyebrow .dot,.rec .rdot{animation:none}
+    .chip i,.eyebrow .dot,.rec .rdot{animation:none}
     .caret{animation:none;opacity:1}
-    *{scroll-behavior:auto}
   }
 </style>
 </head>
 <body>
 
-<header class="hero">
+<nav class="bar">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="chip"><i></i><i></i><i></i><i></i></span><span class="wordmark">freeflo</span></a>
+    <div class="links">
+      <a class="nlink hide" href="#how">How it works</a>
+      <a class="nlink hide" href="#privacy">Privacy</a>
+      <a class="nlink" href="https://github.com/rachitgupta6720/freeflo">GitHub</a>
+      <a class="nlink" href="#download" style="color:var(--text)">Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
   <div class="wrap">
     <div>
-      <p class="eyebrow"><span class="dot"></span>Offline dictation · macOS</p>
-      <h1>Hold a key.<br>Speak. It's <span class="flow">typed.</span></h1>
-      <p class="lede">freeflo turns your voice into text in any app on your Mac — and every word stays on your machine.</p>
+      <p class="eyebrow"><span class="dot"></span>Voice → text · on-device · macOS</p>
+      <h1>Hold a key. Speak. <span class="dim">It's typed.</span></h1>
+      <p class="lede">Voice to text in any app. Transcribed on your Mac — nothing ever leaves it.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="https://github.com/rachitgupta6720/freeflo/releases/latest/download/freeflo.zip">
           Download for Mac <span class="sz">.zip · 652 MB</span>
         </a>
         <a class="btn btn-ghost" href="https://github.com/rachitgupta6720/freeflo">View source</a>
       </div>
-      <p class="hero-note"><b>Free forever.</b> Offline by default — no account or subscription required, no word limits. Apple Silicon &amp; Intel.</p>
+      <p class="mobile-hint" style="margin:14px 0 0;font-size:.85rem;color:var(--faint);gap:8px;align-items:center">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" style="flex:none"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 21h6"/></svg>
+        On your phone? Open this page on your Mac to install.
+      </p>
+      <div class="compat">
+        <span class="warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg>Early build</span>
+        <span class="sep"></span><span><b style="color:var(--text)">Apple Silicon</b> (M1–M4) only</span>
+        <span class="sep"></span><span>Not yet notarized — first launch needs <a href="#run" style="color:var(--muted);border-bottom:1px solid var(--line-3)">one Terminal command ↓</a></span>
+      </div>
     </div>
 
-    <div class="demo" aria-hidden="true">
+    <div class="card hud demo" aria-hidden="true">
       <div class="demo-top"><i></i><i></i><i></i><span>Messages</span></div>
       <div class="field">
         <span class="label">To: Alex</span>
@@ -227,26 +299,44 @@
   </div>
 </header>
 
-<section class="how">
+<section class="run" id="run">
+  <div class="wrap">
+    <div class="card hud runcard">
+      <p class="kicker">Before it opens · one time</p>
+      <h2>Run one command to launch it.</h2>
+      <p class="lede2"><b>Early build, not notarized yet</b> — so macOS blocks it at first. After moving freeflo to Applications, run this once in Terminal.</p>
+      <div class="steps-mini"><span><b>1</b> Download</span><span><b>2</b> Move to Applications</span><span><b>3</b> Run this ↓</span></div>
+      <div class="cmd">
+        <div class="code"><span class="pr">$</span><span>xattr -dr com.apple.quarantine /Applications/freeflo.app</span></div>
+        <button class="copy-btn" data-copy="xattr -dr com.apple.quarantine /Applications/freeflo.app">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          <span class="lbl">Copy</span>
+        </button>
+      </div>
+      <p class="run-note">Open Terminal with <b style="color:var(--muted)">⌘ Space → “Terminal”</b>. Only needed once, on Apple Silicon Macs.</p>
+    </div>
+  </div>
+</section>
+
+<section class="how" id="how">
   <div class="wrap">
     <p class="kicker">How it works</p>
-    <h2>Dictation without the friction.</h2>
-    <p class="sec-lede">No window to switch to, nothing to copy and paste. It works wherever your cursor is — email, chat, code, notes.</p>
-    <div class="steps">
-      <div class="step">
-        <span class="n">STEP 01</span>
-        <h3>Hold the key</h3>
-        <p>Press and hold <span class="key">Left ⌥</span> from anywhere. Or tap <span class="key">Right ⌥</span> once for hands-free.</p>
+    <h2>Hold. Speak. Done.</h2>
+    <div class="flow">
+      <div class="card hud moment">
+        <span class="step-n">01</span>
+        <div class="big"><kbd>⌥</kbd></div>
+        <h3>Hold a key</h3>
       </div>
-      <div class="step">
-        <span class="n">STEP 02</span>
-        <h3>Say it out loud</h3>
-        <p>Speak naturally. A red dot in your menu bar shows freeflo is listening — right on your Mac, never the cloud.</p>
+      <div class="card hud moment">
+        <span class="step-n">02</span>
+        <div class="big"><div class="bars"><span></span><span></span><span></span><span></span><span></span></div></div>
+        <h3>Speak</h3>
       </div>
-      <div class="step">
-        <span class="n">STEP 03</span>
-        <h3>Let go</h3>
-        <p>Release the key and your words appear at the cursor, instantly, in whatever app you're using.</p>
+      <div class="card hud moment">
+        <span class="step-n">03</span>
+        <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h11M4 12h16M4 17h9"/><path d="M19 15v6M17 16l2-1 2 1" opacity=".55"/></svg></div>
+        <h3>It's typed</h3>
       </div>
     </div>
   </div>
@@ -255,103 +345,41 @@
 <section class="features">
   <div class="wrap">
     <p class="kicker">Why freeflo</p>
-    <h2>Small app. Serious respect for your privacy.</h2>
-    <p class="sec-lede">Built on whisper.cpp, freeflo runs the speech model directly on your Mac — so it's fast, works on a plane, and sends nothing anywhere.</p>
+    <h2>Everything local. Nothing in the way.</h2>
     <div class="grid">
-      <div class="cell">
-        <span class="ic">🔒</span>
-        <h3>Truly offline</h3>
-        <p><span class="tag">No internet required.</span> Your voice is transcribed on-device and never leaves your machine.</p>
-      </div>
-      <div class="cell">
-        <span class="ic">🌐</span>
-        <h3>Speaks your language</h3>
-        <p>English, Hindi, Hinglish, Spanish, French, German, Chinese, Japanese, Arabic, Portuguese — or auto-detect.</p>
-      </div>
-      <div class="cell">
-        <span class="ic">✍️</span>
-        <h3>Types anywhere</h3>
-        <p>Works in any app and restores your clipboard afterward, so nothing you'd copied gets lost.</p>
-      </div>
-      <div class="cell">
-        <span class="ic">⌥</span>
-        <h3>Two ways to talk</h3>
-        <p>Push-to-talk for a quick sentence, or toggle mode for hands-free, long-form dictation.</p>
-      </div>
-      <div class="cell">
-        <span class="ic">🕑</span>
-        <h3>Searchable history</h3>
-        <p>Every transcription is saved locally so you can find and reuse it later. Turn it off anytime.</p>
-      </div>
-      <div class="cell">
-        <span class="ic">🎙</span>
-        <h3>Lives in the menu bar</h3>
-        <p>No dock clutter, no window in the way. Just a quiet icon that's there when you need it.</p>
-      </div>
+      <div class="card hud cell">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <h3>On-device</h3><span class="tag">Never leaves your Mac</span></div>
+      <div class="card hud cell">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></svg>
+        <h3>10+ languages</h3><span class="tag">incl. Hindi &amp; Hinglish</span></div>
+      <div class="card hud cell">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20h9M3 20l1-4 11-11a2.1 2.1 0 0 1 3 3L7 19l-4 1Z"/></svg>
+        <h3>Types anywhere</h3><span class="tag">Any app, any field</span></div>
+      <div class="card hud cell">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5a2 2 0 1 0-2 2h10a2 2 0 1 0-2-2M9 19a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2"/></svg>
+        <h3>Two modes</h3><span class="tag">Push-to-talk or hands-free</span></div>
+      <div class="card hud cell">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <h3>Local history</h3><span class="tag">Searchable &amp; private</span></div>
+      <div class="card hud cell">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3ZM6 11a6 6 0 0 0 12 0M12 18v3"/></svg>
+        <h3>Menu bar</h3><span class="tag">No dock clutter</span></div>
     </div>
   </div>
 </section>
 
-<section class="privacy">
+<section class="privacy" id="privacy">
   <div class="wrap">
-    <div>
-      <p class="kicker">Private by design</p>
-      <span class="lock">🔒</span>
-      <h2>Your voice never leaves your Mac.</h2>
-      <p class="sec-lede">freeflo is private by default — not because a policy promises it, but because the speech model runs entirely on your own machine. Your voice never has to touch a server.</p>
+    <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    <h2>Your words never leave your Mac.</h2>
+    <p class="sec-lede">Transcription runs on-device. Audio is deleted the second it's transcribed.</p>
+    <div class="chips-row">
+      <span><b>On-device</b> · whisper.cpp</span>
+      <span><b>No account</b> required</span>
+      <span>Analytics <b>optional &amp; anonymous</b></span>
+      <span><b>Open source</b> · MIT</span>
     </div>
-    <ul class="priv-points">
-      <li><span class="chk">✓</span>
-        <div><b>Your audio is never uploaded</b>
-        <p>Speech is transcribed on-device by whisper.cpp. Dictation needs no internet connection at all — it even works on a plane.</p></div></li>
-      <li><span class="chk">✓</span>
-        <div><b>Your conversations stay yours</b>
-        <p>Dictate confidential emails, health notes, or client work — your speech is transcribed locally and never sent off for anyone else to process, log, or train on.</p></div></li>
-      <li><span class="chk">✓</span>
-        <div><b>History stays on your Mac by default</b>
-        <p>Transcripts live in a private database on your machine <span class="path">(~/Library/Application Support/freeflo)</span> — search it, clear it, or turn it off. If you want, you can also back it up to a hidden folder in <em>your own</em> Google Drive; that's off unless you switch it on.</p></div></li>
-      <li><span class="chk">✓</span>
-        <div><b>No account required, no tracking</b>
-        <p>No sign-up, no telemetry, no analytics — freeflo doesn't know who you are. (Optional Drive backup uses your own Google account, and only if you enable it.)</p></div></li>
-    </ul>
-  </div>
-</section>
-
-<section class="compare">
-  <div class="wrap">
-    <p class="kicker">How it compares</p>
-    <h2>Everything you need. None of the subscription.</h2>
-    <p class="sec-lede">Cloud dictation apps like Wispr Flow are polished — but they stream your voice (and screenshots of your screen) to their servers, and bill you every month. freeflo does the core job on-device, for free, for life.</p>
-
-    <div class="price-band">
-      <div class="pcard free">
-        <div class="who">freeflo</div>
-        <div class="amt">$0</div>
-        <div class="sub">Free forever · open source · no limits</div>
-      </div>
-      <div class="pcard">
-        <div class="who">Wispr Flow — Pro</div>
-        <div class="amt">$15<span style="font-size:1rem;font-weight:500">/mo</span></div>
-        <div class="sub">or $144/yr · free tier capped at 2,000 words/week</div>
-      </div>
-    </div>
-
-    <div class="table-wrap">
-      <table class="cmp">
-        <thead><tr><th scope="col">&nbsp;</th><th scope="col" class="ff">freeflo</th><th scope="col">Wispr Flow</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">Price</th><td class="ff">Free forever</td><td class="other">$15/mo · $144/yr</td></tr>
-          <tr><th scope="row">Word limit</th><td class="ff">Unlimited</td><td class="other">2,000 words/week (free tier)</td></tr>
-          <tr><th scope="row">Works offline</th><td class="ff"><span class="yes">✓</span> Fully offline</td><td class="other"><span class="no">✗</span> Internet required</td></tr>
-          <tr><th scope="row">Where your audio is processed</th><td class="ff">On your Mac</td><td class="other">Sent to their cloud</td></tr>
-          <tr><th scope="row">Captures your screen for context</th><td class="ff"><span class="yes">✓</span> Never</td><td class="other"><span class="no">✗</span> Yes, sent to cloud</td></tr>
-          <tr><th scope="row">Account required</th><td class="ff"><span class="yes">✓</span> No</td><td class="other"><span class="no">✗</span> Yes</td></tr>
-          <tr><th scope="row">Open source</th><td class="ff"><span class="yes">✓</span> Yes (MIT)</td><td class="other"><span class="no">✗</span> Proprietary</td></tr>
-          <tr><th scope="row">Cost over 3 years</th><td class="ff">$0</td><td class="other">~$432</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="cmp-note">Wispr Flow pricing and features as of July 2026 (wisprflow.ai and its docs). In fairness, Wispr Flow offers cloud-side AI cleanup and formatting that freeflo doesn't — freeflo's trade is simple: your speech, on your machine, at no cost.</p>
   </div>
 </section>
 
@@ -362,10 +390,7 @@
         <p class="kicker">Download &amp; install</p>
         <h2>Up and running in about two minutes.</h2>
         <div class="req">
-          <span>macOS 12 Monterey or later</span>
-          <span>Apple Silicon or Intel</span>
-          <span>A microphone</span>
-          <span>~1.5 GB free space</span>
+          <span>macOS 12 or later</span><span>Apple Silicon</span><span>A microphone</span><span>~1.5 GB free</span>
         </div>
         <p class="ver">Latest release: <b class="verno">v1.1.0</b> · <a href="https://github.com/rachitgupta6720/freeflo/blob/master/CHANGELOG.md">changelog</a></p>
       </div>
@@ -374,60 +399,20 @@
       </a>
     </div>
 
-    <div class="install">
-      <div class="istep">
-        <div class="num">1</div>
-        <div>
-          <h3>Download and unzip</h3>
-          <p>Click <b>Download freeflo</b> above. When it finishes, double-click <code>freeflo.zip</code> in your Downloads to unzip it — you'll get <b>freeflo</b>.</p>
-        </div>
-      </div>
-      <div class="istep">
-        <div class="num">2</div>
-        <div>
-          <h3>Move it to Applications</h3>
-          <p>Drag <b>freeflo</b> into your <span class="path">Applications</span> folder. That's where Mac apps live.</p>
-        </div>
-      </div>
-      <div class="istep">
-        <div class="num">3</div>
-        <div>
-          <h3>Open it the first time</h3>
-          <p>Because freeflo is from an independent developer (not the App Store), macOS checks with you first. Double-click it — if you see <b>“Apple could not verify…”</b>, click <b>Done</b>.</p>
-          <p>Then open <span class="path">System Settings → Privacy &amp; Security</span>, scroll down, and click <b>Open Anyway</b> next to freeflo. Confirm with <b>Open</b>. You only do this once.</p>
-        </div>
-      </div>
-      <div class="istep">
-        <div class="num">4</div>
-        <div>
-          <h3>Allow the microphone &amp; keyboard</h3>
-          <p>freeflo needs two permissions: the <b>Microphone</b> (to hear you) and <b>Accessibility</b> (to type into other apps and use the hotkey). macOS will prompt you — say yes.</p>
-          <p>If the hotkey doesn't work, go to <span class="path">System Settings → Privacy &amp; Security → Accessibility</span>, switch <b>freeflo</b> on, and relaunch it.</p>
-        </div>
-      </div>
-      <div class="istep">
-        <div class="num">5</div>
-        <div>
-          <h3>Look up — you're ready</h3>
-          <p>Find the <b>🎙</b> icon in your menu bar. Put your cursor anywhere, <b>hold Left Option (⌥)</b>, say a sentence, and let go. Welcome to hands-free typing.</p>
-        </div>
-      </div>
+    <div class="card install">
+      <div class="istep"><div class="num">1</div><div><h3>Unzip</h3><p>Double-click <code>freeflo.zip</code> in Downloads.</p></div></div>
+      <div class="istep"><div class="num">2</div><div><h3>Move to Applications</h3><p>Drag <b>freeflo</b> into <span class="path">Applications</span>.</p></div></div>
+      <div class="istep"><div class="num">3</div><div><h3>Run the command above</h3><p>Paste it into Terminal, then open freeflo. Once only.</p></div></div>
+      <div class="istep"><div class="num">4</div><div><h3>Grant Mic &amp; Accessibility</h3><p>Onboarding walks you through it — then hold ⌥ and speak.</p></div></div>
     </div>
-
-    <div class="callout">
-      <span style="font-size:1.2rem;line-height:1">📦</span>
-      <div><b>Why 644 MB?</b> The download bundles the complete speech-recognition models right inside the app, so freeflo works fully offline the moment you open it — no extra setup, no downloads, no sign-in.</div>
-    </div>
-
-    <p class="stuck">Still blocked after step 3? Open <b>Terminal</b> and run <code>xattr -dr com.apple.quarantine /Applications/freeflo.app</code>, then try again. Prefer to build from source instead? See the <a href="https://github.com/rachitgupta6720/freeflo#readme" style="color:var(--teal)">README on GitHub</a>.</p>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
     <div>
-      <div class="brand">freeflo</div>
-      <div style="margin-top:6px">Offline dictation for macOS · Free forever · MIT licensed</div>
+      <div class="brand" style="display:flex;align-items:center;gap:10px"><span class="chip"><i></i><i></i><i></i><i></i></span><span class="wordmark">freeflo</span></div>
+      <div style="margin-top:10px">On-device dictation for macOS · Free forever · MIT licensed</div>
     </div>
     <nav class="foot-links">
       <a href="https://github.com/rachitgupta6720/freeflo">GitHub</a>
@@ -440,52 +425,60 @@
 
 <script>
 (function(){
+  // copy-to-clipboard for the Terminal command(s)
+  document.querySelectorAll(".copy-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var text = btn.getAttribute("data-copy") || "";
+      var done = function(){
+        btn.classList.add("done");
+        var lbl = btn.querySelector(".lbl"); if(lbl) lbl.textContent = "Copied ✓";
+        setTimeout(function(){ btn.classList.remove("done"); if(lbl) lbl.textContent = "Copy"; }, 1800);
+      };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta);
+        ta.select(); try{ document.execCommand("copy"); }catch(e){} document.body.removeChild(ta); done();
+      }
+    });
+  });
+
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var el = document.getElementById("typed");
-  var phrases = [
-    "Let's ship freeflo this week \u{1F680}",
-    "मैं घर पहुँच गया हूँ",
-    "Meeting moved to 3pm — works for me."
-  ];
-  if(reduce){ el.textContent = phrases[0]; return; }
-
-  var pi=0, ci=0, deleting=false;
-  function tick(){
-    var full = phrases[pi];
-    el.textContent = full.slice(0, ci);
-    if(!deleting){
-      if(ci < full.length){ ci++; setTimeout(tick, 55 + Math.random()*45); }
-      else { deleting=true; setTimeout(tick, 1500); }
-    } else {
-      if(ci > 0){ ci--; setTimeout(tick, 24); }
-      else { deleting=false; pi=(pi+1)%phrases.length; setTimeout(tick, 420); }
+  var phrases = ["Let's ship freeflo this week \u{1F680}","मैं घर पहुँच गया हूँ","Meeting moved to 3pm — works for me."];
+  if(el){
+    if(reduce){ el.textContent = phrases[0]; }
+    else {
+      var pi=0, ci=0, deleting=false;
+      (function tick(){
+        var full = phrases[pi]; el.textContent = full.slice(0, ci);
+        if(!deleting){
+          if(ci < full.length){ ci++; setTimeout(tick, 55 + Math.random()*45); }
+          else { deleting=true; setTimeout(tick, 1500); }
+        } else {
+          if(ci > 0){ ci--; setTimeout(tick, 24); }
+          else { deleting=false; pi=(pi+1)%phrases.length; setTimeout(tick, 420); }
+        }
+      })();
     }
   }
-  setTimeout(tick, 600);
-
-  // waveform
   var cv = document.getElementById("wave");
   if(!cv || reduce) return;
-  var ctx = cv.getContext("2d");
-  var dpr = window.devicePixelRatio || 1;
+  var ctx = cv.getContext("2d"), dpr = window.devicePixelRatio || 1;
   function size(){ cv.width = cv.clientWidth*dpr; cv.height = 26*dpr; }
   size(); window.addEventListener("resize", size);
   var t=0;
-  function draw(){
+  (function draw(){
     var w=cv.width, h=cv.height; ctx.clearRect(0,0,w,h);
     var bars=Math.floor(w/(5*dpr)), mid=h/2;
     for(var i=0;i<bars;i++){
-      var x=i*5*dpr+1;
-      var a=Math.sin(t*0.06 + i*0.5), b=Math.sin(t*0.11 + i*0.9);
-      var amp=(Math.abs(a)*0.6 + Math.abs(b)*0.4);
-      var bh=Math.max(2*dpr, amp*h*0.9);
-      ctx.fillStyle = i%3===0 ? "#FF4B3E" : "rgba(200,206,214,0.55)";
-      var r=1.5*dpr;
+      var x=i*5*dpr+1, a=Math.sin(t*0.06 + i*0.5), b=Math.sin(t*0.11 + i*0.9);
+      var amp=(Math.abs(a)*0.6 + Math.abs(b)*0.4), bh=Math.max(2*dpr, amp*h*0.9);
+      ctx.fillStyle = i%3===0 ? "#ffffff" : "rgba(255,255,255,0.32)";
       ctx.fillRect(x, mid-bh/2, 3*dpr, bh);
     }
     t++; requestAnimationFrame(draw);
-  }
-  draw();
+  })();
 })();
 </script>
 </body>
