@@ -10,6 +10,10 @@ DATA_FILES = [
         os.path.expanduser('~/whisper.cpp/build-static/bin/whisper-cli'),
         os.path.expanduser('~/whisper.cpp/models/ggml-base.en.bin'),   # English (fast)
         os.path.expanduser('~/whisper.cpp/models/ggml-small.bin'),      # Multilingual (Hindi etc.)
+        # Turbo-mode LLM engine (llama.cpp), built STATIC/self-contained so it
+        # carries no @rpath dylibs or Homebrew deps (see build-static, mirrors
+        # whisper.cpp). Models are NOT bundled — downloaded on demand.
+        os.path.expanduser('~/llama.cpp/build-static/bin/llama-server'),
     ]),
     # Window HTML assets -> Contents/Resources/ui (see config.get_ui_dir).
     ('ui', ['ui/index.html', 'ui/onboarding.html']),
@@ -154,15 +158,17 @@ def strip_conflicting_dist_info():
 
 
 def post_build_fix_permissions():
-    """Ensure whisper-cli retains its executable bit after py2app copies it."""
+    """Ensure bundled binaries retain their executable bit after py2app copies
+    them (whisper-cli for speech->text, llama-server for Turbo mode)."""
     bundle = os.path.join('dist', 'freeflo.app')
-    binary = os.path.join(bundle, 'Contents', 'Resources', 'whisper-cli')
-    if os.path.exists(binary):
-        current = os.stat(binary).st_mode
-        os.chmod(binary, current | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        print(f'post-build: chmod +x {binary}')
-    else:
-        print(f'post-build WARNING: whisper-cli not found at {binary}')
+    for name in ('whisper-cli', 'llama-server'):
+        binary = os.path.join(bundle, 'Contents', 'Resources', name)
+        if os.path.exists(binary):
+            current = os.stat(binary).st_mode
+            os.chmod(binary, current | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            print(f'post-build: chmod +x {binary}')
+        else:
+            print(f'post-build WARNING: {name} not found at {binary}')
 
 
 # PEP 420 namespace packages (no __init__.py) cannot be imported from py2app's
