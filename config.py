@@ -34,6 +34,12 @@ _DEFAULTS = {
     # --- appearance (Phase 4 uses these; stored here so onboarding can set them) ---
     'theme': 'system',           # 'system' | 'light' | 'dark' | 'glass'
     'glass': False,              # glassmorphism vibrancy on top of the base theme
+
+    # --- Turbo mode (local LLM formatting) ---
+    'turbo_enabled': False,        # master on/off
+    'turbo_model': 'balanced',     # active tier id: 'lite' | 'balanced' | 'max'
+    'turbo_style': 'clean',        # 'clean' | 'bullets' | 'summary' | 'email'
+    'turbo_models_installed': [],  # tier ids the user has downloaded + verified
 }
 
 # Selectable hotkey keys. Each carries the virtual keycode of the physical key
@@ -81,6 +87,29 @@ def get_whisper_cli():
     if r:
         return os.path.join(r, 'whisper-cli')
     return os.path.expanduser('~/whisper.cpp/build-static/bin/whisper-cli')
+
+
+def get_llama_server():
+    """Path to the llama.cpp server binary. Bundled in Resources when packaged,
+    else built locally at ~/llama.cpp."""
+    r = _resources_dir()
+    if r:
+        return os.path.join(r, 'llama-server')
+    return os.path.expanduser('~/llama.cpp/build-static/bin/llama-server')
+
+
+def get_models_dir():
+    """Writable folder for user-downloaded Turbo models (NOT the bundle — the
+    bundle is read-only). Created on first use."""
+    d = os.path.join(_CONFIG_DIR, 'models')   # ~/Library/Application Support/freeflo/models
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def get_turbo_model_path(tier):
+    """Where a given tier's .gguf lives on disk once downloaded."""
+    from engine.models import MODELS
+    return os.path.join(get_models_dir(), MODELS[tier]['filename'])
 
 
 def get_google_client():

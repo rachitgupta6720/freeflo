@@ -187,6 +187,10 @@
   .shield{ display:flex; gap:12px; align-items:flex-start; padding:14px 16px; margin-top:12px; background:linear-gradient(180deg,rgba(127,127,140,.06),transparent); }
   .shield b{ font-weight:640; } .shield p{ margin:2px 0 0; color:var(--muted); font-size:12.5px; }
   .link-btn{ background:none; border:none; color:var(--faint); font-size:12px; text-decoration:underline; cursor:pointer; padding:0; }
+  .bar{ height:6px; margin-top:8px; background:var(--surface-3); border-radius:3px; overflow:hidden; }
+  .bar i{ display:block; height:100%; background:var(--hi); width:0; transition:width .2s; }
+  #turboStyle{ width:100%; font:13px/1 var(--sans); padding:10px 12px; border-radius:9px; cursor:pointer;
+    border:1px solid var(--line-2); background:var(--surface-3); color:var(--text); }
   .msg-line{ font-size:12.5px; min-height:16px; margin-top:10px; color:#ff8f8f; }
   .prow{ display:flex; gap:12px; align-items:flex-start; padding:16px 18px; }
   .prow .txt{ flex:1; } .prow .txt h3{ margin:0 0 3px; font-size:14px; } .prow .txt p{ margin:0; color:var(--muted); font-size:12.5px; }
@@ -223,6 +227,7 @@
       <a data-view="shortcuts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5a2 2 0 1 0-2 2h10a2 2 0 1 0-2-2M9 19a2 2 0 1 1-2-2h10a2 2 0 1 1-2 2"/></svg>Shortcuts <span class="kb">⌥</span></a>
       <a data-view="backup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 18a4 4 0 0 1-.5-7.97 5.5 5.5 0 0 1 10.6-1.6A3.75 3.75 0 0 1 17.5 18H7Z"/></svg>Backup</a>
       <a data-view="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Privacy</a>
+      <a data-view="turbo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>Turbo</a>
     </nav>
     <div class="nav-label">Shape freeflo</div>
     <nav class="nav">
@@ -328,6 +333,29 @@
         <div><b>Transcribed text and audio are always excluded</b><p>A guarantee, not a setting.</p></div></div>
     </section>
 
+    <!-- TURBO -->
+    <section class="view" id="v-turbo">
+      <div class="head"><div><h1>Turbo mode</h1>
+        <p>Polish every dictation with a local AI model. 100% on your Mac — text never leaves your device.</p></div></div>
+
+      <div class="card hud">
+        <div class="prow"><div class="txt"><h3>Enable Turbo</h3>
+          <p>Clean up and structure each dictation before it's pasted. Adds a little latency.</p></div>
+          <span class="toggle" id="turboToggle"></span></div>
+      </div>
+
+      <div class="card hud"><h3 style="margin:0 0 10px">Model</h3>
+        <div id="turboModels"></div></div>
+
+      <div class="card hud"><h3 style="margin:0 0 10px">Style</h3>
+        <select id="turboStyle">
+          <option value="clean">Clean — fix grammar, keep everything</option>
+          <option value="bullets">Bullets — reorganize into a list</option>
+          <option value="summary">Summary — condense to key points</option>
+          <option value="email">Email — polished message</option>
+        </select></div>
+    </section>
+
     <!-- REQUEST -->
     <section class="view" id="v-request">
       <div class="head"><div><h1>Request a feature</h1><p>Tell freeflo's AI what you need. Every request is logged and triaged.</p></div>
@@ -366,6 +394,8 @@
     else if (name === 'privacy') onPrivacy(p);
     else if (name === 'theme') onTheme(p);
     else if (name === 'feature_ack') onFeatureAck(p);
+    else if (name === 'turbo_status') onTurboStatus(p);
+    else if (name === 'turbo_progress') onTurboProgress(p);
   };
 
   const LANG = { en:'English', hi:'Hindi', auto:'Auto', es:'Spanish', fr:'French', de:'German',
@@ -401,6 +431,7 @@
     else if (id === 'shortcuts') send('get_shortcuts');
     else if (id === 'backup') send('get_backup_status');
     else if (id === 'privacy') send('get_privacy');
+    else if (id === 'turbo') send('get_turbo');
   }));
 
   // ---------- home / record orb ----------
@@ -529,6 +560,49 @@
   function onPrivacy(p){ setToggle(analyticsToggle, p.analytics !== false); setToggle(crashToggle, p.crash !== false); }
   analyticsToggle.addEventListener('click', () => { analyticsToggle.classList.toggle('on'); send('set_privacy', { analytics: analyticsToggle.classList.contains('on') }); });
   crashToggle.addEventListener('click', () => { crashToggle.classList.toggle('on'); send('set_privacy', { crash: crashToggle.classList.contains('on') }); });
+
+  // ---------- turbo ----------
+  const turboToggle = document.getElementById('turboToggle');
+  const turboModels = document.getElementById('turboModels');
+  const turboStyle  = document.getElementById('turboStyle');
+
+  turboToggle.addEventListener('click', () => {
+    const on = !turboToggle.classList.contains('on');
+    send('set_turbo', { on });               // Python confirms via turbo_status
+  });
+  turboStyle.addEventListener('change', () => send('set_turbo_style', { style: turboStyle.value }));
+
+  function onTurboStatus(p){
+    setToggle(turboToggle, p.enabled);
+    turboStyle.value = p.style || 'clean';
+    turboModels.innerHTML = (p.tiers || []).map(t => `
+      <div class="b-row" data-tier="${t.id}">
+        <div class="txt">
+          <h3>${t.label} ${t.id === p.active ? '· <span style="color:var(--hi)">active</span>' : ''}</h3>
+          <p>${t.blurb} — ${t.size_gb} GB · ${t.ram}</p>
+          <div class="bar" style="display:none"><i></i></div>
+        </div>
+        ${t.installed
+          ? `<button class="link-btn" data-act="use" data-tier="${t.id}">Use</button>
+             <button class="link-btn" data-act="del" data-tier="${t.id}">Delete</button>`
+          : `<button class="btn" data-act="dl" data-tier="${t.id}">Download</button>`}
+      </div>`).join('');
+    // wire the freshly-rendered buttons
+    turboModels.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const tier = b.dataset.tier;
+      if (b.dataset.act === 'dl')  send('download_model', { tier });
+      if (b.dataset.act === 'del') send('delete_model', { tier });
+      if (b.dataset.act === 'use') send('set_turbo_model', { tier });
+    }));
+  }
+
+  function onTurboProgress(p){
+    const row = turboModels.querySelector(`[data-tier="${p.tier}"]`);
+    if (!row) return;
+    const bar = row.querySelector('.bar');
+    if (p.error){ alert(p.error); return; }
+    if (bar){ bar.style.display = 'block'; bar.querySelector('i').style.width = p.pct + '%'; }
+  }
 
   // ---------- request → agent ----------
   const thread = document.getElementById('thread'), reqInput = document.getElementById('reqInput'), reqSend = document.getElementById('reqSend');

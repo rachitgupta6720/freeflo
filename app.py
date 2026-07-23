@@ -12,6 +12,7 @@ from engine.recorder import Recorder
 from engine.transcriber import transcribe
 from engine.injector import inject
 from engine import history, gauth, backup, logs, updater, telemetry
+from engine import refiner, model_manager
 from hotkey import HotkeyListener
 
 log = logging.getLogger('freeflo.app')
@@ -429,6 +430,80 @@ class FreefloApp(rumps.App):
             self._set_theme(body)
         elif action == 'feature_request':
             self._handle_feature_request(body)
+        elif action == 'get_turbo':
+            self._send_turbo_status()
+        elif action == 'set_turbo':
+            self._set_turbo(bool(body.get('on')))
+        elif action == 'set_turbo_model':
+            self._set_turbo_model(str(body.get('tier')))
+        elif action == 'set_turbo_style':
+            s = cfg.load(); s['turbo_style'] = str(body.get('style')); cfg.save(s)
+            self._send_turbo_status()
+        elif action == 'download_model':
+            self._download_model(str(body.get('tier')))
+        elif action == 'delete_model':
+            model_manager.delete(str(body.get('tier')))
+            self._send_turbo_status()
+
+    def _send_turbo_status(self):
+        from engine import models as _models
+        s = cfg.load()
+        tiers = []
+        for tier, m in _models.MODELS.items():
+            tiers.append({
+                'id': tier, 'label': m['label'], 'blurb': m['blurb'],
+                'size_gb': round(m['size_bytes'] / 1e9, 1), 'ram': m['ram_note'],
+                'installed': _models.is_installed(tier),
+            })
+        self._push_ui('turbo_status', {
+            'enabled': s.get('turbo_enabled', False),
+            'active': s.get('turbo_model', 'balanced'),
+            'style': s.get('turbo_style', 'clean'),
+            'ready': refiner.is_ready(),
+            'tiers': tiers,
+        })
+
+    def _set_turbo(self, on):
+        from engine import models as _models
+        s = cfg.load()
+        s['turbo_enabled'] = on
+        cfg.save(s)
+        if on:
+            tier = s.get('turbo_model', 'balanced')
+            if not _models.is_installed(tier):
+                self._push_ui('turbo_status', {'needs_download': tier})
+                self._send_turbo_status()
+                return
+            # start the server on a background thread (loading is slow)
+            threading.Thread(target=self._start_turbo_server, args=(tier,),
+                             daemon=True).start()
+        else:
+            refiner.stop()
+        self._send_turbo_status()
+
+    def _start_turbo_server(self, tier):
+        ok = refiner.start(tier)
+        if not ok:
+            log.error('Turbo server failed to start for tier %s', tier)
+        self._send_turbo_status()
+
+    def _set_turbo_model(self, tier):
+        from engine import models as _models
+        s = cfg.load(); s['turbo_model'] = tier; cfg.save(s)
+        if s.get('turbo_enabled') and _models.is_installed(tier):
+            threading.Thread(target=self._start_turbo_server, args=(tier,),
+                             daemon=True).start()
+        self._send_turbo_status()
+
+    def _download_model(self, tier):
+        def worker():
+            def progress(pct, done, total):
+                self._push_ui('turbo_progress', {'tier': tier, 'pct': round(pct, 1)})
+            ok, err = model_manager.download(tier, on_progress=progress)
+            self._push_ui('turbo_progress',
+                          {'tier': tier, 'pct': 100 if ok else 0, 'error': err})
+            self._send_turbo_status()
+        threading.Thread(target=worker, daemon=True).start()
 
     def _send_privacy(self):
         s = cfg.load()
@@ -604,6 +679,7 @@ class FreefloApp(rumps.App):
             telemetry.flush()
         except Exception:
             pass
+        refiner.stop()   # never leave a llama-server process behind
         rumps.quit_application()
 
     def _send_shortcuts(self):
@@ -1093,6 +1169,9 @@ class FreefloApp(rumps.App):
                 else:
                     self._push_ui('test_result', payload)
             elif text:
+                settings = cfg.load()
+                if settings.get('turbo_enabled') and refiner.is_ready():
+                    text = refiner.refine(text, settings.get('turbo_style', 'clean'))
                 inject(text)
                 self._set_state('idle', f'"{text[:40]}{"…" if len(text) > 40 else ""}"')
                 telemetry.dictation_completed(
@@ -1140,6 +1219,7 @@ if __name__ == '__main__':
         except Exception:
             pass
     atexit.register(_snapshot_on_exit)   # backstop for exits that skip the Quit menu
+    atexit.register(refiner.stop)        # never leave a llama-server process behind
 
     try:
         FreefloApp().run()
