@@ -14,6 +14,8 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-23
+
 ## [1.1.0] - 2026-07-14
 
 _Changes landing here will roll into the next release. The app binary is
