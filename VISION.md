@@ -84,13 +84,22 @@ These are non-negotiable. They constrain the roadmap, the architecture, and the 
 
 ## Design language & why
 
-The brand is deliberately neutral and monochrome: a living waveform chip + a chromed,
-uppercase wordmark (lockup **A+1**), hairline structure, HUD/terminal precision cues. It reads
-as *powerful, futuristic, and permanent*. We chose this because the product is a trust product:
-it handles your voice and your data on your own machine. The visual language has to say
-"serious tool that will endure," not "fun feature that will vanish." The full brand system
-lives in [`design/brand.html`](design/brand.html); the app and onboarding prototypes in
-[`design/onboarding.html`](design/onboarding.html) and [`design/app-window.html`](design/app-window.html).
+freeflo's visual identity follows Apple's marketing/product design language: San Francisco in
+**semibold with negative tracking**, **strictly monochrome** ink-on-off-white (or true black
+in the app) with **no accent color** — emphasis comes from weight and contrast, not hue — pill
+CTAs, "Learn more ›" chevron links, bento grids, translucent chrome, and cinematic whitespace. The brand mark is a **neutral chrome**
+lockup — a living waveform chip beside the chromed uppercase `FREEFLO` wordmark — never
+colorized. We chose this language because the product is a trust product: it handles your
+voice and your data on your own machine. The visual language says *serious tool that will
+endure* — it looks at home on macOS while remaining unmistakably freeflo. "Designed to
+disappear."
+
+**The design system is governed by [`design/DESIGN_SYSTEM.md`](design/DESIGN_SYSTEM.md) —
+read it before building or changing any surface.** Reference implementations:
+[`design/design-system.html`](design/design-system.html) (the full system as an apple.com-style
+page), [`design/brand.html`](design/brand.html) (locked A+1 lockup),
+[`design/onboarding.html`](design/onboarding.html), [`design/app-window.html`](design/app-window.html),
+and the public site [`docs/index.html`](docs/index.html).
 
 ## How we listen
 
