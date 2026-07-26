@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>freeflo · Design System</title>
+<meta name="description" content="The freeflo design language — an Apple-grade system for on-device voice.">
+<style>
+/* ============================================================
+   freeflo — Design System
+   Modeled on Apple's marketing/product design language:
+   restraint, generous whitespace, SF semibold headlines with
+   negative tracking, ink-on-off-white, pill CTAs, bento grids,
+   translucent nav, and intentional dark sections.
+   ============================================================ */
+
+:root {
+  /* ---- Type ---- */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-text:    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono:    "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+
+  /* ---- Color · light canvas ---- */
+  --ink:        #1d1d1f;   /* primary text / marks            */
+  --text-2:     #6e6e73;   /* secondary text                  */
+  --text-3:     #86868b;   /* tertiary text / captions        */
+  --canvas:     #ffffff;   /* base page                       */
+  --canvas-2:   #f5f5f7;   /* Apple's signature off-white     */
+  --hairline:   rgba(0,0,0,.10);
+  --fill:       rgba(0,0,0,.04);
+  --fill-2:     rgba(0,0,0,.06);
+
+  /* ---- Color · dark canvas ---- */
+  --dark:       #000000;
+  --dark-2:     #101012;
+  --dark-text:  #f5f5f7;
+  --dark-text-2:#a1a1a6;
+  --dark-hairline: rgba(255,255,255,.14);
+
+  /* ---- Action (strictly monochrome — no color) ---- */
+  --action:      #1d1d1f;  /* primary CTA fill on light       */
+  --action-hover:#000000;
+  --action-dark: #f5f5f6;  /* primary CTA fill on dark        */
+  --link:        #1d1d1f;  /* inline links on light           */
+  --link-dark:   #f5f5f6;  /* inline links on dark            */
+
+  /* ---- Radius ---- */
+  --r-btn:  980px;         /* Apple's full pill               */
+  --r-card: 18px;
+  --r-tile: 28px;
+  --r-hero: 34px;
+
+  /* ---- Elevation (used sparingly — Apple leans flat) ---- */
+  --shadow-1: 0 4px 20px rgba(0,0,0,.06);
+  --shadow-2: 0 12px 40px rgba(0,0,0,.10);
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(.28,.11,.32,1);   /* Apple's standard  */
+  --dur:  .4s;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; }
+body {
+  font-family: var(--font-text);
+  font-size: 17px; line-height: 1.47059; letter-spacing: -.022em;
+  color: var(--ink); background: var(--canvas);
+}
+img { display: block; max-width: 100%; }
+a { color: var(--link); text-decoration: none; }
+
+/* ---- Layout ---- */
+.wrap    { max-width: 1024px; margin: 0 auto; padding: 0 22px; }
+.wrap-sm { max-width: 720px;  margin: 0 auto; padding: 0 22px; }
+section  { padding: 110px 0; }
+.tight   { padding: 72px 0; }
+
+/* ---- Type ramp (Apple-accurate: semibold, negative tracking) ---- */
+.eyebrow {
+  font-family: var(--font-text);
+  font-size: 19px; font-weight: 600; letter-spacing: -.012em;
+  color: var(--text-2); margin-bottom: 6px;
+}
+.display {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 8vw, 96px); font-weight: 600;
+  line-height: 1.04; letter-spacing: -.015em;
+}
+.headline {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 5vw, 56px); font-weight: 600;
+  line-height: 1.07; letter-spacing: -.012em;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3vw, 32px); font-weight: 600;
+  line-height: 1.125; letter-spacing: -.008em;
+}
+.lead {
+  font-family: var(--font-display);
+  font-size: clamp(19px, 2.4vw, 28px); font-weight: 400;
+  line-height: 1.28; letter-spacing: -.01em; color: var(--text-2);
+}
+.body   { font-size: 17px; line-height: 1.47; letter-spacing: -.022em; }
+.caption{ font-size: 14px; line-height: 1.43; letter-spacing: -.016em; color: var(--text-3); }
+.mono   { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0; color: var(--text-3); }
+
+/* Chrome / metallic wordmark treatment (brand: neutral, chromed uppercase) */
+.chrome {
+  background: linear-gradient(180deg, #e9e9ec 0%, #b9b9c0 22%, #7c7c85 50%, #b9b9c0 78%, #f4f4f6 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.on-dark .chrome {
+  background: linear-gradient(180deg, #ffffff 0%, #cfcfd6 30%, #8f8f98 52%, #d9d9df 74%, #ffffff 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ============================================================ NAV */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  height: 48px; display: flex; align-items: center;
+  background: rgba(251,251,253,.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid transparent; transition: border-color var(--dur) var(--ease);
+}
+.nav.scrolled { border-bottom-color: var(--hairline); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.nav-links { display: flex; gap: 26px; }
+.nav-links a {
+  font-size: 12px; letter-spacing: -.01em; color: var(--ink); opacity: .82;
+  transition: opacity .2s var(--ease);
+}
+.nav-links a:hover { opacity: 1; }
+
+/* Brand lockup: waveform chip + chromed uppercase wordmark (monochrome) */
+.lockup { display: inline-flex; align-items: center; gap: 9px; }
+.chip {
+  width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+  background: linear-gradient(160deg, #3a3a40, #0c0c0e);
+  display: flex; align-items: center; justify-content: center; gap: 2px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+}
+.chip i {
+  display: block; width: 2px; border-radius: 2px;
+  background: linear-gradient(180deg, #f4f4f6, #b9b9c0);
+  animation: wave 1.1s var(--ease) infinite alternate;
+}
+.chip i:nth-child(1){ height: 6px;  animation-delay: 0s;    }
+.chip i:nth-child(2){ height: 12px; animation-delay: .12s;  }
+.chip i:nth-child(3){ height: 16px; animation-delay: .24s;  }
+.chip i:nth-child(4){ height: 10px; animation-delay: .36s;  }
+.chip i:nth-child(5){ height: 5px;  animation-delay: .48s;  }
+@keyframes wave { from { transform: scaleY(.45); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce){ .chip i { animation: none; } }
+.wordmark {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: 17px; letter-spacing: .04em; text-transform: uppercase;
+}
+
+/* ============================================================ HERO */
+.hero { text-align: center; padding: 130px 0 96px; }
+.hero .eyebrow { font-size: 21px; }
+.hero .display { margin: 8px 0 22px; }
+.hero .lead { max-width: 640px; margin: 0 auto 34px; }
+.hero-cta { display: inline-flex; gap: 26px; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+/* ============================================================ BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: var(--font-text); font-size: 17px; font-weight: 400;
+  letter-spacing: -.022em; line-height: 1.18;
+  padding: 11px 22px; border-radius: var(--r-btn); border: none;
+  cursor: pointer; transition: background .22s var(--ease), transform .1s var(--ease);
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.98); }
+.btn-primary   { background: var(--action); color: #fff; }
+.btn-primary:hover { background: var(--action-hover); }
+.btn-secondary { background: var(--fill-2); color: var(--ink); }
+.btn-secondary:hover { background: rgba(0,0,0,.1); }
+.btn-lg { font-size: 19px; padding: 13px 28px; }
+.on-dark .btn-primary { background: var(--action-dark); color: var(--ink); }
+.on-dark .btn-primary:hover { background: #ffffff; }
+.on-dark .btn-secondary { background: rgba(255,255,255,.1); color: var(--dark-text); }
+.on-dark .btn-secondary:hover { background: rgba(255,255,255,.18); }
+
+/* Chevron text link — Apple's signature "Learn more ›" */
+.link-chev {
+  font-size: 17px; color: var(--link); display: inline-flex; align-items: center; gap: 3px;
+}
+.link-chev::after { content: "›"; font-size: 1.15em; line-height: 0; transition: transform .2s var(--ease); }
+.link-chev:hover { text-decoration: underline; text-underline-offset: 3px; }
+.link-chev:hover::after { transform: translateX(2px); }
+.on-dark .link-chev { color: var(--link-dark); }
+
+/* ============================================================ SECTION HEADERS */
+.sec-head { text-align: center; margin-bottom: 56px; }
+.sec-head .lead { max-width: 620px; margin: 14px auto 0; }
+.kicker {
+  font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-3); margin-bottom: 14px;
+}
+
+/* ============================================================ PRINCIPLES */
+.principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+.principle .num { font-family: var(--font-mono); font-size: 13px; color: var(--text-2); margin-bottom: 12px; }
+.principle p { color: var(--text-2); margin-top: 8px; }
+
+/* ============================================================ COLOR */
+.swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.swatch { border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--hairline); }
+.swatch .chip-lg { height: 120px; }
+.swatch .meta { padding: 12px 14px; background: var(--canvas); }
+.swatch .name { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.swatch .hex  { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.canvas-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.canvas-demo { border-radius: var(--r-tile); padding: 34px; border: 1px solid var(--hairline); }
+.canvas-demo.light { background: var(--canvas-2); color: var(--ink); }
+.canvas-demo.dark  { background: var(--dark); color: var(--dark-text); border-color: var(--dark-hairline); }
+.canvas-demo .t2 { color: var(--text-2); }
+.canvas-demo.dark .t2 { color: var(--dark-text-2); }
+
+/* ============================================================ TYPE SPECIMEN */
+.specimen { border-top: 1px solid var(--hairline); }
+.spec-row {
+  display: grid; grid-template-columns: 160px 1fr; gap: 28px; align-items: baseline;
+  padding: 26px 0; border-bottom: 1px solid var(--hairline);
+}
+.spec-row .label .n { font-size: 14px; font-weight: 600; }
+.spec-row .label .m { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); margin-top: 3px; line-height: 1.5; }
+
+/* ============================================================ BENTO */
+.bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 200px; gap: 16px; }
+.tile {
+  border-radius: var(--r-tile); padding: 32px; overflow: hidden; position: relative;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: var(--canvas-2); border: 1px solid var(--hairline);
+}
+.tile.dark { background: var(--dark); color: var(--dark-text); border-color: var(--dark-hairline); }
+.tile.chrome { background: linear-gradient(150deg,#3a3a40,#0c0c0e); color: #fff; border-color: transparent; }
+.tile .tile-ey { font-size: 13px; font-weight: 600; letter-spacing: -.01em; opacity: .6; margin-bottom: 6px; }
+.tile h3 { font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -.01em; line-height: 1.15; }
+.tile p  { font-size: 15px; color: var(--text-2); margin-top: 8px; }
+.tile.dark p, .tile.chrome p { color: rgba(255,255,255,.72); }
+.tile.w2 { grid-column: span 2; }
+.tile.h2 { grid-row: span 2; justify-content: space-between; }
+.tile .big { font-family: var(--font-display); font-size: clamp(40px,6vw,72px); font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+
+/* Decorative waveform inside a tile */
+.wavebars { display: flex; align-items: flex-end; gap: 5px; height: 64px; }
+.wavebars i {
+  width: 5px; border-radius: 3px; background: currentColor; opacity: .9;
+  animation: wave2 1.2s var(--ease) infinite alternate;
+}
+.wavebars i:nth-child(odd){ animation-duration: 1s; }
+@keyframes wave2 { from { height: 14%; } to { height: 100%; } }
+@media (prefers-reduced-motion: reduce){ .wavebars i { animation: none; height: 60%; } }
+
+/* ============================================================ COMPONENT CARDS */
+.demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.card {
+  background: var(--canvas); border: 1px solid var(--hairline);
+  border-radius: var(--r-tile); padding: 34px; box-shadow: var(--shadow-1);
+}
+.card h4 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 20px; color: var(--text-3); text-transform: uppercase; font-size: 12px; letter-spacing: .05em; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+/* Material / vibrancy demo */
+.material-stage {
+  border-radius: var(--r-tile); padding: 40px; position: relative; overflow: hidden;
+  background: linear-gradient(120deg,#48484f,#1c1c22 55%,#3a3a42 100%);
+  display: flex; gap: 20px; flex-wrap: wrap;
+}
+.glass {
+  flex: 1; min-width: 200px; padding: 24px; border-radius: var(--r-card);
+  background: rgba(255,255,255,.16);
+  backdrop-filter: blur(24px) saturate(140%); -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.28); color: #fff;
+}
+.glass.dark { background: rgba(20,20,22,.44); border-color: rgba(255,255,255,.14); }
+.glass .g-t { font-size: 15px; font-weight: 600; }
+.glass .g-s { font-size: 13px; opacity: .8; margin-top: 4px; }
+
+/* Radius scale */
+.radii { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+.radii figure { text-align: center; }
+.radii .box { width: 84px; height: 84px; background: var(--fill-2); border: 1px solid var(--hairline); }
+.radii figcaption { margin-top: 10px; }
+.radii .n { font-size: 13px; font-weight: 600; }
+.radii .m { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+
+/* Spacing scale */
+.spacing { display: flex; gap: 18px; align-items: flex-end; }
+.spacing figure { text-align: center; }
+.spacing .bar { width: 22px; background: var(--ink); border-radius: 3px; opacity: .85; }
+.spacing .m { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); margin-top: 8px; }
+
+/* ============================================================ DARK SECTION */
+.dark-section {
+  background: var(--dark); color: var(--dark-text); text-align: center;
+}
+.dark-section .lead, .dark-section .sec-head .lead { color: var(--dark-text-2); }
+.dark-section .kicker { color: var(--dark-text-2); }
+.on-dark { color: var(--dark-text); }
+
+/* ============================================================ MOTION */
+.motion-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 22px; }
+.motion-card { background: var(--canvas-2); border-radius: var(--r-tile); padding: 40px 32px; text-align: center; }
+.motion-dot { width: 56px; height: 56px; border-radius: 16px; background: var(--ink); margin: 0 auto 24px; }
+.m-fade  { animation: mfade 2.4s var(--ease) infinite; }
+.m-rise  { animation: mrise 2.4s var(--ease) infinite; }
+.m-spring{ animation: mspring 2.4s cubic-bezier(.5,1.4,.4,1) infinite; }
+@keyframes mfade   { 0%,100%{opacity:.25} 50%{opacity:1} }
+@keyframes mrise   { 0%,100%{transform:translateY(10px);opacity:.4} 50%{transform:translateY(-10px);opacity:1} }
+@keyframes mspring { 0%,100%{transform:scale(.8)} 50%{transform:scale(1.08)} }
+.motion-card .mn { font-size: 15px; font-weight: 600; }
+.motion-card .mm { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); margin-top: 6px; }
+
+/* ============================================================ FOOTER (apple.com fine print) */
+.footer { background: var(--canvas-2); padding: 44px 0 60px; border-top: 1px solid var(--hairline); }
+.footer .fine { font-size: 12px; line-height: 1.5; color: var(--text-3); letter-spacing: -.01em; }
+.footer .fine + .fine { margin-top: 12px; }
+.footer .rule { height: 1px; background: var(--hairline); margin: 24px 0; }
+.footer .foot-bottom { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+/* ============================================================ RESPONSIVE */
+@media (max-width: 860px) {
+  .principles { grid-template-columns: 1fr; gap: 28px; }
+  .swatches   { grid-template-columns: repeat(2,1fr); }
+  .bento      { grid-template-columns: repeat(2,1fr); grid-auto-rows: 180px; }
+  .tile.w2, .tile.h2 { grid-column: span 2; grid-row: auto; }
+  .demo-grid, .canvas-pair, .motion-grid { grid-template-columns: 1fr; }
+  .spec-row   { grid-template-columns: 1fr; gap: 8px; }
+  .nav-links  { display: none; }
+  section     { padding: 76px 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== NAV ===================== -->
+<nav class="nav" id="nav">
+  <div class="wrap">
+    <a class="lockup" href="#top" aria-label="freeflo">
+      <span class="chip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="wordmark chrome">Freeflo</span>
+    </a>
+    <div class="nav-links">
+      <a href="#foundations">Foundations</a>
+      <a href="#color">Color</a>
+      <a href="#type">Typography</a>
+      <a href="#bento">Layout</a>
+      <a href="#components">Components</a>
+      <a href="#motion">Motion</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===================== HERO ===================== -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">freeflo Design System</p>
+    <h1 class="display">Designed to<br><span class="chrome">disappear.</span></h1>
+    <p class="lead">The interface language for on-device voice — built with the clarity, deference, and depth that make a tool feel like it was always part of the Mac.</p>
+    <div class="hero-cta">
+      <a href="#foundations" class="btn btn-primary btn-lg">Explore the system</a>
+      <a href="#components" class="link-chev">See components</a>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== FOUNDATIONS ===================== -->
+<section id="foundations" class="tight">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Foundations</p>
+      <h2 class="headline">Three principles.</h2>
+      <p class="lead">The same ideas that anchor Apple's Human Interface Guidelines — applied to a product whose best interface is almost no interface at all.</p>
+    </div>
+    <div class="principles">
+      <div class="principle">
+        <div class="num">01</div>
+        <h3 class="title">Clarity</h3>
+        <p class="body">Type is legible at every size, icons are precise, and the accent color is reserved for what matters. Negative space does the heavy lifting.</p>
+      </div>
+      <div class="principle">
+        <div class="num">02</div>
+        <h3 class="title">Deference</h3>
+        <p class="body">The UI steps back so your words come forward. Fluid motion and a crisp, unobtrusive chrome keep the focus on content, never on the frame.</p>
+      </div>
+      <div class="principle">
+        <div class="num">03</div>
+        <h3 class="title">Depth</h3>
+        <p class="body">Layered materials and realistic motion convey hierarchy and help you understand where you are — without a single line of instruction.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COLOR ===================== -->
+<section id="color" style="background:var(--canvas-2);">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Color</p>
+      <h2 class="headline">Ink, off-white, chrome.</h2>
+      <p class="lead">A strictly monochrome palette — no accent color. Emphasis comes from ink, chrome, and true black; actions are carried by weight and contrast, never hue.</p>
+    </div>
+
+    <div class="swatches">
+      <div class="swatch"><div class="chip-lg" style="background:#1d1d1f"></div><div class="meta"><div class="name">Ink</div><div class="hex">#1d1d1f</div></div></div>
+      <div class="swatch"><div class="chip-lg" style="background:#6e6e73"></div><div class="meta"><div class="name">Text Secondary</div><div class="hex">#6e6e73</div></div></div>
+      <div class="swatch"><div class="chip-lg" style="background:#86868b"></div><div class="meta"><div class="name">Text Tertiary</div><div class="hex">#86868b</div></div></div>
+      <div class="swatch"><div class="chip-lg" style="background:#111116"></div><div class="meta"><div class="name">App Surface</div><div class="hex">#111116</div></div></div>
+      <div class="swatch"><div class="chip-lg" style="background:#ffffff;border-bottom:1px solid var(--hairline)"></div><div class="meta"><div class="name">Canvas</div><div class="hex">#ffffff</div></div></div>
+      <div class="swatch"><div class="chip-lg" style="background:#f5f5f7"></div><div class="meta"><div class="name">Canvas Off-white</div><div class="hex">#f5f5f7</div></div></div>
+      <div class="swatch"><div class="chip-lg" style="background:#000000"></div><div class="meta"><div class="name">Canvas Dark</div><div class="hex">#000000</div></div></div>
+      <div class="swatch"><div class="chip-lg" style="background:linear-gradient(180deg,#e9e9ec,#7c7c85,#f4f4f6)"></div><div class="meta"><div class="name">Chrome (brand)</div><div class="hex">gradient</div></div></div>
+    </div>
+
+    <div class="canvas-pair">
+      <div class="canvas-demo light">
+        <div class="title">Light</div>
+        <p class="body t2" style="margin-top:8px">Ink on off-white. The default for onboarding, settings, and the marketing site.</p>
+        <div class="row" style="margin-top:20px"><a class="btn btn-primary">Continue</a><a class="link-chev">Learn more</a></div>
+      </div>
+      <div class="canvas-demo dark on-dark">
+        <div class="title">Dark</div>
+        <p class="body t2" style="margin-top:8px">White on true black — for focus modes, the menu-bar popover, and Pro moments.</p>
+        <div class="row" style="margin-top:20px"><a class="btn btn-primary">Continue</a><a class="link-chev">Learn more</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TYPOGRAPHY ===================== -->
+<section id="type">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Typography</p>
+      <h2 class="headline">SF Pro. Semibold. Tightly&nbsp;tracked.</h2>
+      <p class="lead">San Francisco throughout — Display for headlines, Text for body. Headlines are 600 weight with negative letter-spacing; body sits at −0.022em, exactly like apple.com.</p>
+    </div>
+
+    <div class="specimen">
+      <div class="spec-row">
+        <div class="label"><div class="n">Display</div><div class="m">96 / 1.04<br>600 · −0.015em</div></div>
+        <div class="display">Talk to your Mac.</div>
+      </div>
+      <div class="spec-row">
+        <div class="label"><div class="n">Headline</div><div class="m">56 / 1.07<br>600 · −0.012em</div></div>
+        <div class="headline">Private by design.</div>
+      </div>
+      <div class="spec-row">
+        <div class="label"><div class="n">Title</div><div class="m">32 / 1.12<br>600 · −0.008em</div></div>
+        <div class="title">Everything stays on device.</div>
+      </div>
+      <div class="spec-row">
+        <div class="label"><div class="n">Lead</div><div class="m">28 / 1.28<br>400 · −0.01em</div></div>
+        <div class="lead">A calm, quiet interface that gets out of your way.</div>
+      </div>
+      <div class="spec-row">
+        <div class="label"><div class="n">Body</div><div class="m">17 / 1.47<br>400 · −0.022em</div></div>
+        <div class="body">freeflo transcribes your voice locally with whisper.cpp — no servers, no accounts required, no audio ever leaving your machine. The words are yours, and they stay yours.</div>
+      </div>
+      <div class="spec-row">
+        <div class="label"><div class="n">Caption</div><div class="m">14 / 1.43<br>400 · −0.016em</div></div>
+        <div class="caption">Available for Mac. On-device transcription. Free.</div>
+      </div>
+      <div class="spec-row">
+        <div class="label"><div class="n">Mono</div><div class="m">13 · SF Mono</div></div>
+        <div class="mono">⌘ + ⇧ + M &nbsp;·&nbsp; freeflo.app/v1.2.0</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== BENTO / LAYOUT ===================== -->
+<section id="bento" style="background:var(--canvas-2)">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Layout</p>
+      <h2 class="headline">The bento grid.</h2>
+      <p class="lead">Apple's storytelling unit: rounded tiles of mixed weight that let one idea breathe while the supporting cast lines up around it.</p>
+    </div>
+
+    <div class="bento">
+      <div class="tile h2 dark on-dark">
+        <div class="wavebars" style="color:#f5f5f6"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div>
+          <div class="tile-ey">On-device engine</div>
+          <h3>Your voice never<br>leaves the Mac.</h3>
+          <p>whisper.cpp runs locally. Nothing is uploaded, ever.</p>
+        </div>
+      </div>
+      <div class="tile w2 chrome">
+        <div class="tile-ey" style="opacity:.85">Speed</div>
+        <div class="big">&lt;1s</div>
+        <p>From the moment you stop speaking to text on screen.</p>
+      </div>
+      <div class="tile">
+        <div class="tile-ey">Privacy</div>
+        <h3>Zero&nbsp;accounts</h3>
+        <p>Works the second you launch it.</p>
+      </div>
+      <div class="tile">
+        <div class="tile-ey">Cost</div>
+        <div class="big" style="font-size:clamp(32px,4vw,48px)">Free</div>
+        <p>On-device compute. Near-zero marginal cost.</p>
+      </div>
+      <div class="tile w2">
+        <div class="tile-ey">Anywhere</div>
+        <h3>One hotkey, every app.</h3>
+        <p>Dictate into any text field on macOS — mail, code, chat, notes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== COMPONENTS ===================== -->
+<section id="components">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Components</p>
+      <h2 class="headline">Restraint, made reusable.</h2>
+      <p class="lead">Buttons are pills, links carry a chevron, surfaces are soft-cornered, and materials use real vibrancy. Nothing shouts.</p>
+    </div>
+
+    <div class="demo-grid">
+      <div class="card">
+        <h4>Buttons</h4>
+        <div class="row" style="margin-bottom:16px">
+          <a class="btn btn-primary">Get freeflo</a>
+          <a class="btn btn-secondary">Learn more</a>
+        </div>
+        <div class="row" style="margin-bottom:16px">
+          <a class="btn btn-primary btn-lg">Get freeflo</a>
+          <a class="btn btn-secondary btn-lg">Learn more</a>
+        </div>
+        <div class="row">
+          <a class="link-chev">Watch the film</a>
+          <a class="link-chev" style="margin-left:20px">Compare versions</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>Radius scale</h4>
+        <div class="radii">
+          <figure><div class="box" style="border-radius:10px"></div><figcaption><div class="n">Control</div><div class="m">10px</div></figcaption></figure>
+          <figure><div class="box" style="border-radius:18px"></div><figcaption><div class="n">Card</div><div class="m">18px</div></figcaption></figure>
+          <figure><div class="box" style="border-radius:28px"></div><figcaption><div class="n">Tile</div><div class="m">28px</div></figcaption></figure>
+          <figure><div class="box" style="border-radius:980px"></div><figcaption><div class="n">Pill</div><div class="m">980px</div></figcaption></figure>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <h4>Materials &amp; vibrancy</h4>
+        <p class="body" style="color:var(--text-2);margin-bottom:20px;max-width:560px">Layered glass over live color — the macOS <span class="mono" style="font-size:12px">NSVisualEffectView</span> look, recreated with <span class="mono" style="font-size:12px">backdrop-filter</span> for the popover and the optional Glass theme.</p>
+        <div class="material-stage">
+          <div class="glass"><div class="g-t">Ready</div><div class="g-s">Press ⌘⇧M to dictate</div></div>
+          <div class="glass dark"><div class="g-t">Transcribing…</div><div class="g-s">On-device · nothing uploaded</div></div>
+          <div class="glass"><div class="g-t">Inserted</div><div class="g-s">312 words · 0.6s</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <h4>Spacing · 8-point rhythm</h4>
+        <div class="spacing">
+          <figure><div class="bar" style="height:24px"></div><div class="m">4</div></figure>
+          <figure><div class="bar" style="height:40px"></div><div class="m">8</div></figure>
+          <figure><div class="bar" style="height:56px"></div><div class="m">16</div></figure>
+          <figure><div class="bar" style="height:80px"></div><div class="m">24</div></figure>
+          <figure><div class="bar" style="height:104px"></div><div class="m">40</div></figure>
+          <figure><div class="bar" style="height:130px"></div><div class="m">64</div></figure>
+          <figure><div class="bar" style="height:150px"></div><div class="m">88</div></figure>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DARK "PRO" STATEMENT ===================== -->
+<section class="dark-section on-dark">
+  <div class="wrap-sm">
+    <p class="kicker">The feel</p>
+    <h2 class="display" style="font-size:clamp(40px,6vw,72px)">Nothing between<br>you and the&nbsp;words.</h2>
+    <p class="lead" style="margin:22px auto 34px;max-width:560px">Deep black. A single accent. Motion that behaves like the physical world. This is where freeflo goes quiet and the work takes over.</p>
+    <a class="btn btn-primary btn-lg">See it in action</a>
+  </div>
+</section>
+
+<!-- ===================== MOTION ===================== -->
+<section id="motion">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Motion</p>
+      <h2 class="headline">Physical, not flashy.</h2>
+      <p class="lead">Every transition uses Apple's standard ease <span class="mono" style="font-size:13px">cubic-bezier(.28,.11,.32,1)</span>. Springs for arrival, fades for change, gentle rise for reveal. Respects Reduce Motion.</p>
+    </div>
+    <div class="motion-grid">
+      <div class="motion-card"><div class="motion-dot m-fade"></div><div class="mn">Fade</div><div class="mm">opacity · 0.4s</div></div>
+      <div class="motion-card"><div class="motion-dot m-rise"></div><div class="mn">Rise</div><div class="mm">translateY · 0.4s ease</div></div>
+      <div class="motion-card"><div class="motion-dot m-spring"></div><div class="mn">Spring</div><div class="mm">scale · spring(.5,1.4)</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="footer">
+  <div class="wrap">
+    <p class="fine">freeflo is a free, private, on-device voice tool for Mac. Transcription runs locally with whisper.cpp; your audio and transcribed text never leave your device. Telemetry, when enabled, is metadata and profile only, and consented.</p>
+    <p class="fine">Design language modeled on Apple's Human Interface Guidelines and marketing design system. San Francisco is a trademark of Apple Inc. This document is an internal design reference, not affiliated with or endorsed by Apple.</p>
+    <div class="rule"></div>
+    <div class="foot-bottom">
+      <span class="fine">Copyright © 2026 freeflo. All rights reserved.</span>
+      <span class="fine">Design System · v2.0</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Hairline appears on nav only after scroll — Apple's exact behavior.
+  var nav = document.getElementById('nav');
+  function onScroll(){ nav.classList.toggle('scrolled', window.scrollY > 8); }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>
