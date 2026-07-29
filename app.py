@@ -307,8 +307,8 @@ class FreefloApp(rumps.App):
                 was_recording = self._is_recording
                 self._is_recording = False
                 self._record_mode = None
+            self._recorder.stop_and_save()   # close mic even if not actively recording
             if was_recording:
-                self._recorder.stop_and_save()   # discard audio
                 try:
                     self._busy_lock.release()
                 except RuntimeError:

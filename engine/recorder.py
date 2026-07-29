@@ -15,6 +15,13 @@ class Recorder:
         self._stream = None
 
     def start(self):
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
         self._frames = []
         self._stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
