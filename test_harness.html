@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>freeflo - Test Harness</title>
+<style>
+body { margin: 0; font-family: -apple-system, "SF Pro Display", system-ui, sans-serif; background: #1a1a2e; color: #f5f5f6; }
+.header { background: #0f0f1a; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; position: fixed; top: 0; left: 0; right: 0; z-index: 1000; height: 48px; }
+.header h1 { font-size: 14px; font-weight: 600; margin: 0; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.btn { padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: #f5f5f6; font-size: 12px; cursor: pointer; }
+.btn:hover { background: rgba(255,255,255,0.12); }
+.btn.active { background: #fff; color: #0a0a0c; }
+.console-log { position: fixed; bottom: 0; left: 0; right: 0; height: 150px; background: rgba(0,0,0,0.9); border-top: 1px solid rgba(255,255,255,0.1); overflow-y: auto; font-family: "SF Mono", monospace; font-size: 11px; padding: 12px; z-index: 1000; color: #a0a0a8; }
+.log-entry { margin-bottom: 4px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.log-entry.send { color: #88d898; }
+.log-entry.receive { color: #ff6b6b; }
+.log-entry.error { color: #ff0000; background: rgba(255,0,0,0.1); }
+.log-entry.info { color: #88d898; }
+.clear-btn { margin-left: auto; }
+#app-container { margin-top: 48px; margin-bottom: 150px; height: calc(100vh - 198px); overflow: auto; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>freeflo Test Harness</h1>
+  <div class="header-actions">
+    <button class="btn" id="toggleConsole">Toggle Console</button>
+    <button class="btn" onclick="clearLog()">Clear</button>
+    <button class="btn" onclick="testSend('get_home')">Test get_home</button>
+    <button class="btn" onclick="testSend('get_history')">Test get_history</button>
+    <button class="btn" onclick="testSend('get_shortcuts')">Test get_shortcuts</button>
+    <button class="btn" onclick="testSend('get_turbo')">Test get_turbo</button>
+    <span id="status" style="font-size:12px;color:#88d898;margin-left:12px;">Initializing...</span>
+  </div>
+</div>
+<div id="app-container"></div>
+<div class="console-log" id="console" style="display:block;">
+  <div id="logEntries"></div>
+</div>
+
+<script>
+// ========== Mock Bridge ==========
+var logEntries = document.getElementById('logEntries');
+function logEntry(type, data) {
+  var entry = document.createElement('div');
+  entry.className = 'log-entry ' + type.toLowerCase();
+  entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + type + ': ' + JSON.stringify(data);
+  logEntries.appendChild(entry);
+  logEntries.scrollTop = logEntries.scrollHeight;
+}
+function clearLog() { logEntries.innerHTML = ''; }
+
+document.getElementById('toggleConsole').onclick = function() {
+  var c = document.getElementById('console');
+  c.style.display = c.style.display === 'none' ? 'block' : 'none';
+};
+
+// Bridge functions (must exist before UI loads)
+var messageLog = [];
+
+function send(action, extra) {
+  var msg = {action: action};
+  if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) msg[k] = extra[k];
+  messageLog.push({type: 'send', data: msg, time: new Date().toLocaleTimeString()});
+  logEntry('SEND', msg);
+  document.getElementById('status').textContent = 'Sent: ' + action;
+  simulateResponse(action, msg);
+}
+
+function testSend(action) {
+  send(action, {});
+}
+
+function simulateResponse(action, msg) {
+  setTimeout(function() {
+    var name = null, response = null;
+    switch(action) {
+      case 'get_theme':
+        name = 'theme'; response = {theme: 'dark', glass: false}; break;
+      case 'get_home':
+        name = 'home'; response = {
+          stats: {today: 37, words_week: 5912, total: 1250},
+          language: 'en', ptt_key: 'left_option', enabled: true,
+          recent: [
+            {ts: Date.now()/1000 - 3600, text: 'Draft a reply to Priya', mode: 'ptt'},
+            {ts: Date.now()/1000 - 7200, text: 'Summarize the meeting notes', mode: 'toggle'}
+          ]
+        }; break;
+      case 'get_history':
+        name = 'history'; response = {
+          entries: [
+            {ts: Date.now()/1000 - 3600, text: 'Test transcription 1 - hello world', language: 'en', mode: 'ptt'},
+            {ts: Date.now()/1000 - 7200, text: 'Test transcription 2 - meeting recap', language: 'en', mode: 'toggle'},
+            {ts: Date.now()/1000 - 14400, text: 'Spanish test - buenos dias', language: 'es', mode: 'ptt'}
+          ], save_history: true
+        }; break;
+      case 'get_shortcuts':
+        name = 'shortcuts'; response = {
+          keys: [
+            {id: 'left_option', label: 'Left ⌥'}, {id: 'right_option', label: 'Right ⌥'},
+            {id: 'right_command', label: 'Right ⌘'}, {id: 'right_control', label: 'Right ⌃'}
+          ],
+          ptt_key: 'left_option', toggle_key: 'right_option', language: 'en',
+          languages: [
+            {code: 'en', name: 'English'}, {code: 'hi', name: 'Hindi'},
+            {code: 'es', name: 'Spanish'}, {code: 'fr', name: 'French'},
+            {code: 'auto', name: 'Auto-detect'}
+          ]
+        }; break;
+      case 'get_privacy':
+        name = 'privacy'; response = {analytics: true, crash: true}; break;
+      case 'get_backup_status':
+        name = 'backup_status'; response = {configured: false, connected: false, enabled: false, syncing: false}; break;
+      case 'get_turbo':
+        name = 'turbo_status'; response = {
+          enabled: false, active: 'balanced', style: 'clean', ready: false,
+          tiers: [
+            {id: 'lite', label: 'Lite — Llama 3.2 1B', blurb: 'Fastest, lowest memory', size_gb: 0.8, ram: '~1.5 GB RAM', installed: true},
+            {id: 'balanced', label: 'Balanced — Llama 3.2 3B', blurb: 'Recommended', size_gb: 2.0, ram: '~3 GB RAM', installed: false},
+            {id: 'max', label: 'Max — Qwen 2.5 7B', blurb: 'Best quality', size_gb: 4.7, ram: '~6 GB RAM', installed: false}
+          ]
+        }; break;
+      case 'test_start':
+        name = 'status'; response = {state: 'recording'}; break;
+      case 'test_stop':
+        name = 'status'; response = {state: 'processing'}; break;
+      default:
+        logEntry('INFO', {action: action, note: 'No mock response configured'});
+        return;
+    }
+    if (name && response) {
+      messageLog.push({type: 'receive', data: response, time: new Date().toLocaleTimeString()});
+      logEntry('RECV', {name: name, data: response});
+      if (typeof window.freefloReceive === 'function') {
+        try { window.freefloReceive(name, response); }
+        catch(e) { logEntry('ERROR', {message: 'Handler error: ' + e.message}); }
+      }
+    }
+  }, 80);
+}
+
+// ========== Load UI ==========
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'ui/index.html', true);
+xhr.onload = function() {
+  if (xhr.status === 200) {
+    var html = xhr.responseText;
+    
+    // Extract CSS and inject into head
+    var styleMatch = html.match(/<style>([\s\S]*?)<\/style>/);
+    if (styleMatch) {
+      var styleEl = document.createElement('style');
+      styleEl.textContent = styleMatch[1];
+      document.head.appendChild(styleEl);
+    }
+    
+    // Extract body content and insert into container
+    var bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/);
+    if (bodyMatch) {
+      var container = document.getElementById('app-container');
+      container.innerHTML = bodyMatch[1];
+      document.getElementById('status').textContent = 'UI loaded ✓';
+      
+      // Execute the JS with our mock bridge
+      var scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
+      if (scriptMatch) {
+        try {
+          eval(scriptMatch[1]);
+          logEntry('INFO', {message: 'UI script executed successfully'});
+          document.getElementById('status').textContent = 'Ready ✓';
+        } catch(e) {
+          logEntry('ERROR', {message: 'Script error: ' + e.message, stack: e.stack});
+          document.getElementById('status').textContent = 'Error ✗';
+        }
+      }
+    } else {
+      logEntry('ERROR', {message: 'Could not find <body> in UI HTML'});
+    }
+  } else {
+    logEntry('ERROR', {message: 'Failed to load ui/index.html (' + xhr.status + ')'});
+    document.getElementById('status').textContent = 'Load failed ✗';
+  }
+};
+xhr.onerror = function() {
+  logEntry('ERROR', {message: 'Network error loading ui/index.html'});
+  document.getElementById('status').textContent = 'Network error ✗';
+};
+xhr.send();
+</script>
+</body>
+</html>
