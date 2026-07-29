@@ -56,11 +56,15 @@ def inject(text):
             return
 
     time.sleep(_CLIP_SETTLE)
-    subprocess.run(
-        ['osascript', '-e',
-         'tell application "System Events" to keystroke "v" using {command down}'],
-        capture_output=True,
-    )
+    try:
+        subprocess.run(
+            ['osascript', '-e',
+             'tell application "System Events" to keystroke "v" using {command down}'],
+            capture_output=True,
+            timeout=5,
+        )
+    except subprocess.TimeoutExpired:
+        pass
 
     # Wait for the paste to complete before restoring. Only restore if the
     # clipboard still holds *our* text — if the user copied something else in
