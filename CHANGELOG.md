@@ -14,6 +14,26 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-30
+
+### Added
+- A guided 3-step onboarding flow shown on first launch — walks through the
+  microphone and accessibility permissions and the push-to-talk hotkey so
+  dictation works before you leave the setup.
+
+### Changed
+- Unified all preferences into a single **Settings** window instead of scattered
+  menu items, and moved feedback into an in-app form so you can send a report
+  without leaving the app.
+- Landing page and design language reworked into Apple's marketing style, with a
+  clearer download-and-open (quarantine bypass) walkthrough.
+
+### Fixed
+- Microphone no longer stays open after a dictation finishes — the yellow
+  in-use indicator now clears instead of persisting.
+- Processing indicator no longer gets stuck when a paste is slow; the paste step
+  now times out so the app recovers on its own.
+
 ## [1.2.0] - 2026-07-23
 
 ## [1.1.0] - 2026-07-14
