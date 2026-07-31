@@ -31,12 +31,9 @@ _ACCESSIBILITY_URL = (
 
 # (name shown in menu, whisper language code)
 # 'auto' removes the -l flag — whisper detects the language from audio.
-# Hinglish (Hindi+English code-switching) has no dedicated whisper code;
-# auto-detect gives the best results for mixed-language speech.
 _LANGUAGES = [
     ('English',     'en'),
     ('Hindi',       'hi'),
-    ('Hinglish',    'auto'),
     ('Spanish',     'es'),
     ('French',      'fr'),
     ('German',      'de'),
