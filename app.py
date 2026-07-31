@@ -36,7 +36,6 @@ _ACCESSIBILITY_URL = (
 _LANGUAGES = [
     ('English',     'en'),
     ('Hindi',       'hi'),
-    ('Hinglish',    'auto'),
     ('Spanish',     'es'),
     ('French',      'fr'),
     ('German',      'de'),
