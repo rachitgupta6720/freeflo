@@ -10,6 +10,19 @@ _CONFIG_FILE = os.path.join(_CONFIG_DIR, 'config.json')
 # Settings used to live here under the app's old name — migrate on first run.
 _LEGACY_CONFIG_FILE = os.path.join(_APP_SUPPORT, 'WhisperDictate', 'config.json')
 
+# Turbo now runs ONE model with a chosen writing register. These are the valid
+# `turbo_style` values — the single source of truth, imported by refiner/app so
+# the list can't drift. (Kept here, a dependency-free module, to avoid a
+# config<->refiner import cycle.)
+REGISTER_KEYS = ('natural', 'casual', 'professional', 'formal')
+# Old per-task styles map onto the new registers on read (see load()).
+_STYLE_MIGRATION = {
+    'clean':   'natural',
+    'bullets': 'natural',
+    'summary': 'natural',
+    'email':   'professional',
+}
+
 _DEFAULTS = {
     'enabled': True,
     'language': 'en',      # ISO 639-1 code, or 'auto' for auto-detect
@@ -37,9 +50,10 @@ _DEFAULTS = {
 
     # --- Turbo mode (local LLM formatting) ---
     'turbo_enabled': False,        # master on/off
-    'turbo_model': 'balanced',     # active tier id: 'lite' | 'balanced' | 'max'
-    'turbo_style': 'clean',        # 'clean' | 'bullets' | 'summary' | 'email'
+    'turbo_model': 'lite',         # single model now; always 'lite' (kept for compat)
+    'turbo_style': 'natural',      # writing register: see REGISTER_KEYS
     'turbo_models_installed': [],  # tier ids the user has downloaded + verified
+    'turbo_migrated_v2': False,    # one-shot flag: reclaimed old multi-model files
 }
 
 # Selectable hotkey keys. Each carries the virtual keycode of the physical key
@@ -225,13 +239,48 @@ def load():
         return _DEFAULTS.copy()
     with open(_CONFIG_FILE) as f:
         data = json.load(f)
-    return {**_DEFAULTS, **data}
+    return _normalize_turbo({**_DEFAULTS, **data})
+
+
+def _normalize_turbo(data):
+    """Read-time normalization for the single-model Turbo migration. Cheap,
+    idempotent, never touches disk — safe to run on every load(). Legacy styles
+    map to a register; anything unknown falls back to 'natural'; the model tier
+    is always pinned to 'lite' now."""
+    style = _STYLE_MIGRATION.get(data.get('turbo_style'), data.get('turbo_style'))
+    data['turbo_style'] = style if style in REGISTER_KEYS else 'natural'
+    data['turbo_model'] = 'lite'
+    return data
 
 
 def save(data):
     os.makedirs(_CONFIG_DIR, exist_ok=True)
     with open(_CONFIG_FILE, 'w') as f:
         json.dump(data, f, indent=2)
+
+
+def migrate_turbo_v2():
+    """One-shot: reclaim disk from the old multi-model Turbo. Deletes any
+    downloaded 'balanced'/'max' .gguf files (up to ~6.7 GB) now that Turbo runs
+    a single 'lite' model, and pins the config to the new scheme. Guarded by a
+    persisted flag so it runs at most once, and only at startup — before any
+    llama-server could be holding a file open. Best-effort: never raises."""
+    try:
+        s = load()
+        if s.get('turbo_migrated_v2'):
+            return
+        from engine import models, model_manager
+        for tier in list(models.MODELS):
+            if tier != 'lite' and models.is_installed(tier):
+                model_manager.delete(tier)  # removes file + prunes turbo_models_installed
+        s = load()                          # reload: delete() rewrote turbo_models_installed
+        s['turbo_migrated_v2'] = True
+        s['turbo_model'] = 'lite'
+        if s.get('turbo_style') not in REGISTER_KEYS:
+            s['turbo_style'] = 'natural'
+        save(s)
+    except Exception:
+        pass
 
 
 def get_or_create_install_id():

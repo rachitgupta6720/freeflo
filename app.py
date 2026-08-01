@@ -438,10 +438,10 @@ class FreefloApp(rumps.App):
             self._send_turbo_status()
         elif action == 'set_turbo':
             self._set_turbo(bool(body.get('on')))
-        elif action == 'set_turbo_model':
-            self._set_turbo_model(str(body.get('tier')))
         elif action == 'set_turbo_style':
-            s = cfg.load(); s['turbo_style'] = str(body.get('style')); cfg.save(s)
+            style = str(body.get('style'))
+            if style in cfg.REGISTER_KEYS:   # ignore stale/unknown values
+                s = cfg.load(); s['turbo_style'] = style; cfg.save(s)
             self._send_turbo_status()
         elif action == 'download_model':
             self._download_model(str(body.get('tier')))
@@ -465,19 +465,15 @@ class FreefloApp(rumps.App):
     def _send_turbo_status(self):
         from engine import models as _models
         s = cfg.load()
-        tiers = []
-        for tier, m in _models.MODELS.items():
-            tiers.append({
-                'id': tier, 'label': m['label'], 'blurb': m['blurb'],
-                'size_gb': round(m['size_bytes'] / 1e9, 1), 'ram': m['ram_note'],
-                'installed': _models.is_installed(tier),
-            })
+        m = _models.MODELS['lite']
         self._push_ui('turbo_status', {
             'enabled': s.get('turbo_enabled', False),
-            'active': s.get('turbo_model', 'balanced'),
-            'style': s.get('turbo_style', 'clean'),
+            'style': s.get('turbo_style', 'natural'),
             'ready': refiner.is_ready(),
-            'tiers': tiers,
+            'lite': {
+                'installed': _models.is_installed('lite'),
+                'size_gb': round(m['size_bytes'] / 1e9, 1),
+            },
         })
 
     def _set_turbo(self, on):
@@ -486,7 +482,7 @@ class FreefloApp(rumps.App):
         s['turbo_enabled'] = on
         cfg.save(s)
         if on:
-            tier = s.get('turbo_model', 'balanced')
+            tier = 'lite'   # single model now
             if not _models.is_installed(tier):
                 self._push_ui('turbo_status', {'needs_download': tier})
                 self._send_turbo_status()
@@ -504,14 +500,6 @@ class FreefloApp(rumps.App):
             log.error('Turbo server failed to start for tier %s', tier)
         self._send_turbo_status()
 
-    def _set_turbo_model(self, tier):
-        from engine import models as _models
-        s = cfg.load(); s['turbo_model'] = tier; cfg.save(s)
-        if s.get('turbo_enabled') and _models.is_installed(tier):
-            threading.Thread(target=self._start_turbo_server, args=(tier,),
-                             daemon=True).start()
-        self._send_turbo_status()
-
     def _download_model(self, tier):
         def worker():
             def progress(pct, done, total):
@@ -519,7 +507,13 @@ class FreefloApp(rumps.App):
             ok, err = model_manager.download(tier, on_progress=progress)
             self._push_ui('turbo_progress',
                           {'tier': tier, 'pct': 100 if ok else 0, 'error': err})
-            self._send_turbo_status()
+            # If Turbo was switched on before the model existed, the toggle
+            # bailed at needs_download. Now that it's here, start the server so
+            # the user doesn't have to toggle again.
+            if ok and cfg.load().get('turbo_enabled'):
+                self._start_turbo_server(tier)   # this also re-sends turbo status
+            else:
+                self._send_turbo_status()
         threading.Thread(target=worker, daemon=True).start()
 
     def _send_privacy(self):
@@ -1303,7 +1297,7 @@ class FreefloApp(rumps.App):
             elif text:
                 settings = cfg.load()
                 if settings.get('turbo_enabled') and refiner.is_ready():
-                    text = refiner.refine(text, settings.get('turbo_style', 'clean'))
+                    text = refiner.refine(text, settings.get('turbo_style', 'natural'))
                 inject(text)
                 self._set_state('idle', f'"{text[:40]}{"…" if len(text) > 40 else ""}"')
                 telemetry.dictation_completed(
@@ -1344,6 +1338,7 @@ if __name__ == '__main__':
     logs.setup_logging()
     logs.install_excepthooks()
     telemetry.init()   # consent-gated + inert without keys; never sends text
+    cfg.migrate_turbo_v2()   # one-shot: reclaim old multi-model disk before any server starts
 
     def _snapshot_on_exit():
         try:
