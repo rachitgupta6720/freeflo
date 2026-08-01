@@ -11,7 +11,7 @@ import config as cfg
 from engine.recorder import Recorder
 from engine.transcriber import transcribe
 from engine.injector import inject
-from engine import history, gauth, backup, logs, updater, telemetry
+from engine import history, saved, gauth, backup, logs, updater, telemetry
 from engine import refiner, model_manager
 from hotkey import HotkeyListener
 
@@ -73,6 +73,13 @@ class FreefloApp(rumps.App):
                 log.warning('Restored %d history entries from local snapshot', restored)
         except Exception:
             log.exception('Snapshot restore check failed')
+
+        try:
+            restored_saved = saved.restore_from_snapshot_if_empty()
+            if restored_saved:
+                log.warning('Restored %d saved prompts from local snapshot', restored_saved)
+        except Exception:
+            log.exception('Saved prompts snapshot restore check failed')
 
         # Shared state — written from any thread, read by timer on main thread
         self._state = 'idle' if self._enabled else 'disabled'
@@ -441,6 +448,19 @@ class FreefloApp(rumps.App):
         elif action == 'delete_model':
             model_manager.delete(str(body.get('tier')))
             self._send_turbo_status()
+        elif action == 'get_saved_prompts':
+            q = body.get('query') if hasattr(body, 'get') else None
+            self._send_saved_prompts(str(q) if q else None)
+        elif action == 'save_prompt_from_history':
+            self._save_from_history(body)
+        elif action == 'unsave_prompt':
+            self._unsave_prompt(body)
+        elif action == 'add_manual_prompt':
+            self._add_manual_prompt(body)
+        elif action == 'remove_saved_prompt':
+            self._remove_saved_prompt(body)
+        elif action == 'edit_saved_prompt':
+            self._edit_saved_prompt(body)
 
     def _send_turbo_status(self):
         from engine import models as _models
@@ -514,11 +534,117 @@ class FreefloApp(rumps.App):
             entries = history.list_entries(query=query, limit=300)
         except Exception:
             entries = []
+        try:
+            saved_uuids = list(saved.saved_history_uuids())
+        except Exception:
+            saved_uuids = []
         settings = cfg.load()
         self._push_ui('history', {
             'entries': entries,
             'save_history': settings.get('save_history', True),
+            'saved_uuids': saved_uuids,
         })
+
+    # ------------------------------------------------------------------
+    # Saved prompts
+    # ------------------------------------------------------------------
+
+    def _send_saved_prompts(self, query):
+        try:
+            entries = saved.list_entries(query=query, limit=300)
+        except Exception:
+            entries = []
+        self._push_ui('saved_prompts', {'entries': entries})
+
+    def _send_saved_uuids(self):
+        try:
+            uuids = list(saved.saved_history_uuids())
+        except Exception:
+            uuids = []
+        self._push_ui('saved_uuids', {'uuids': uuids})
+
+    def _save_from_history(self, body):
+        try:
+            text = str(body.get('text') or '').strip()
+            history_uuid = str(body.get('history_uuid') or '')
+        except Exception:
+            return
+        if not text or not history_uuid:
+            return
+        try:
+            saved.add_from_history(text, history_uuid)
+        except Exception:
+            log.exception('Failed to save prompt from history')
+            return
+        self._write_snapshot_async()
+        self._maybe_sync_backup()
+        self._send_saved_uuids()
+
+    def _unsave_prompt(self, body):
+        try:
+            history_uuid = str(body.get('history_uuid') or '')
+        except Exception:
+            return
+        if not history_uuid:
+            return
+        try:
+            saved.remove_by_history_uuid(history_uuid)
+        except Exception:
+            log.exception('Failed to unsave prompt')
+            return
+        self._write_snapshot_async()
+        self._maybe_sync_backup()
+        self._send_saved_uuids()
+
+    def _add_manual_prompt(self, body):
+        try:
+            text = str(body.get('text') or '').strip()
+        except Exception:
+            return
+        if not text:
+            return
+        try:
+            saved.add_manual(text)
+        except Exception:
+            log.exception('Failed to add manual prompt')
+            return
+        self._write_snapshot_async()
+        self._maybe_sync_backup()
+        self._send_saved_prompts(None)
+
+    def _remove_saved_prompt(self, body):
+        try:
+            uuid = str(body.get('uuid') or '')
+        except Exception:
+            return
+        if not uuid:
+            return
+        try:
+            saved.remove(uuid)
+        except Exception:
+            log.exception('Failed to remove saved prompt')
+            return
+        self._write_snapshot_async()
+        self._maybe_sync_backup()
+        self._send_saved_prompts(None)
+        self._send_saved_uuids()
+
+    def _edit_saved_prompt(self, body):
+        try:
+            uuid = str(body.get('uuid') or '')
+            text = str(body.get('text') or '').strip()
+        except Exception:
+            return
+        if not uuid or not text:
+            return
+        try:
+            saved.edit(uuid, text)
+        except Exception:
+            log.exception('Failed to edit saved prompt')
+            return
+        self._write_snapshot_async()
+        self._maybe_sync_backup()
+        self._send_saved_prompts(None)
 
     # ------------------------------------------------------------------
     # Google backup
@@ -562,9 +688,8 @@ class FreefloApp(rumps.App):
         if delete_remote:
             try:
                 backup.delete_remote()
+                backup.delete_remote_saved()
             except Exception as e:
-                # Stay connected so the user can retry — disconnecting now would
-                # orphan a Drive backup they believe was just deleted.
                 self._send_backup_status(
                     {'error': f'Could not delete Drive backup: {e}. Still connected — try again.'}
                 )
@@ -600,7 +725,10 @@ class FreefloApp(rumps.App):
             result = None
             while True:
                 result = backup.sync()
-                # Drain any request that arrived while we were syncing.
+                try:
+                    backup.sync_saved()
+                except Exception:
+                    log.warning('Saved prompts sync failed', exc_info=True)
                 if not self._backup_pending:
                     break
                 self._backup_pending = False
@@ -646,6 +774,10 @@ class FreefloApp(rumps.App):
         try:
             while True:
                 history.write_snapshot()
+                try:
+                    saved.write_snapshot()
+                except Exception:
+                    log.warning('Saved prompts snapshot failed', exc_info=True)
                 if not self._snapshot_pending:
                     break
                 self._snapshot_pending = False
@@ -656,9 +788,11 @@ class FreefloApp(rumps.App):
 
     def _flush_backup_blocking(self):
         try:
-            if (cfg.load().get('backup_enabled') and history.dirty_entries()
+            has_dirty = history.dirty_entries() or saved.dirty_entries()
+            if (cfg.load().get('backup_enabled') and has_dirty
                     and gauth.is_connected()):
                 backup.sync()
+                backup.sync_saved()
         except Exception as e:
             log.warning('Final backup flush failed: %s', e)
 
@@ -667,6 +801,7 @@ class FreefloApp(rumps.App):
         The backup flush is bounded so a hung network can't block quitting."""
         try:
             history.write_snapshot()
+            saved.write_snapshot()
         except Exception:
             log.exception('Snapshot on quit failed')
         t = threading.Thread(target=self._flush_backup_blocking, daemon=True)
@@ -1213,6 +1348,7 @@ if __name__ == '__main__':
     def _snapshot_on_exit():
         try:
             history.write_snapshot()
+            saved.write_snapshot()
         except Exception:
             pass
     atexit.register(_snapshot_on_exit)   # backstop for exits that skip the Quit menu
