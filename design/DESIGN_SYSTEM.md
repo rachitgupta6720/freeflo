@@ -12,6 +12,7 @@
 |------|--------|---------------|
 | `design/design-system.html` | Light | The full system, laid out like an apple.com page — tokens, type, bento, components, motion. |
 | `design/brand.html` | Dark | Logo lockups. **A + 1 is locked.** |
+| `design/app-icon-concepts.html` | Dark | macOS app-icon concepts. **04 · Monogram Bars is locked** (see §2). |
 | `design/app-window.html` | Dark | The macOS app / menu-bar popover. |
 | `design/onboarding.html` | Dark | First-run flow. |
 | `design/vision.html` | Dark | Internal product-vision narrative. |
@@ -53,6 +54,26 @@ Neutral / monochrome only. Never colorize the mark.
 **Don't:** add color to the mark · use the old blue→purple gradient · set the
 wordmark lowercase in a header lockup · use heavy drop shadows · stretch or
 recolor the chrome.
+
+### macOS app icon (Dock / Finder / Spotlight)
+
+**Locked separately from the A+1 lockup:** the app icon is the **Monogram
+Bars** mark — three chrome pill-bars forming an "F" (top bar + mid bar + full
+-height stem), on the same near-black gradient face as the chip
+(`linear-gradient(155deg,#2a2a33,#0a0a0e)`), full-bleed in a rounded-square
+(`border-radius ≈ 22.3%` of canvas) with a soft ambient drop shadow baked into
+the PNG (legacy `.icns`, not an Xcode asset catalog — macOS does not
+auto-mask/auto-shadow it). Chosen over the waveform chip itself because the
+chip's bars smear at 16–32px (Finder list view / Dock-hover-off sizes);
+the F-monogram reads cleanly at every size down to 16px.
+
+Source of truth: `design/app-icon-concepts.html` (concept **04**, "Monogram
+Bars"), rendered to `freeflo.icns` at the repo root. Regenerate by re-rendering
+that concept's `.shape-fmono` markup at 16/32/64/128/256/512/1024px (transparent
+background) and packing with `iconutil -c icns`.
+
+**Don't:** substitute the waveform-chip mark for the Dock icon · add color ·
+let the corner-radius/shadow drift from the values above.
 
 ---
 
@@ -292,6 +313,10 @@ Display per view.
 
 ## 14 · Changelog
 
+- **v2.2 (2026-08-02)** — Locked the **macOS app icon**: Monogram Bars
+  (chrome F built from three pill-bars), replacing the old generic blue
+  "ribbon F" `freeflo.icns`. Deliberately a different mark from the A+1
+  waveform chip — chosen for legibility at 16–32px. See §2.
 - **v2.1 (2026-07-27)** — Locked **strictly monochrome, no accent color**.
   Replaced System Blue CTAs/links with ink (light) / white-chrome (dark) fills;
   removed all hue from the reference implementation.
