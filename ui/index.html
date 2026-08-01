@@ -402,14 +402,19 @@
           </div>
         </div>
         <div class="card hud" id="turboModelsCard" style="margin-top:10px; display:none">
-          <div style="padding:16px 18px 4px"><h3 style="font-size:14px; margin:0 0 10px">Model</h3><div id="turboModels"></div></div>
-          <div style="padding:4px 18px 16px; border-top:1px solid var(--line); margin-top:12px">
-            <h3 style="font-size:14px; margin:12px 0 8px">Style</h3>
+          <div id="turboDownload" style="padding:16px 18px; border-bottom:1px solid var(--line); display:none">
+            <div class="s-row" style="padding:0">
+              <div class="txt"><h3>Download AI model</h3><p id="turboDlText">One-time download to enable Turbo.</p><div class="bar" style="display:none"><i></i></div></div>
+              <button class="btn" style="font-size:12px;padding:7px 12px" id="turboDlBtn">Download</button>
+            </div>
+          </div>
+          <div style="padding:16px 18px">
+            <h3 style="font-size:14px; margin:0 0 8px">Style</h3>
             <select id="turboStyle">
-              <option value="clean">Clean — fix grammar, keep everything</option>
-              <option value="bullets">Bullets — reorganize into a list</option>
-              <option value="summary">Summary — condense to key points</option>
-              <option value="email">Email — polished message</option>
+              <option value="natural">Natural — sounds like you, lightly cleaned</option>
+              <option value="casual">Casual — relaxed and friendly</option>
+              <option value="professional">Professional — polished and clear</option>
+              <option value="formal">Formal — structured and proper</option>
             </select>
           </div>
         </div>
@@ -622,33 +627,21 @@
   const turboToggle = document.getElementById('turboToggle');
   turboToggle.addEventListener('click', () => send('set_turbo',{on:!turboToggle.classList.contains('on')}));
   document.getElementById('turboStyle').addEventListener('change', () => send('set_turbo_style',{style:document.getElementById('turboStyle').value}));
+  document.getElementById('turboDlBtn').addEventListener('click', () => send('download_model',{tier:'lite'}));
   function onTurboStatus(p){
+    if (p.enabled === undefined) return;   // ignore partial pushes (e.g. needs_download)
     setToggle(turboToggle, p.enabled);
     document.getElementById('turboModelsCard').style.display = p.enabled ? '' : 'none';
-    document.getElementById('turboStyle').value = p.style || 'clean';
-    document.getElementById('turboModels').innerHTML = (p.tiers||[]).map(t => `
-      <div class="s-row" style="border-bottom:1px solid var(--line)">
-        <div class="txt"><h3>${t.label}${t.id===p.active?' · <span style="color:var(--hi)">active</span>':''}</h3>
-          <p>${t.blurb} — ${t.size_gb} GB · ${t.ram}</p><div class="bar" style="display:none"><i></i></div></div>
-        ${t.installed
-          ? `<button class="btn" style="font-size:12px;padding:7px 12px" data-act="use" data-tier="${t.id}">Use</button>
-             <button class="btn ghost" style="font-size:12px;padding:7px 12px;margin-left:4px" data-act="del" data-tier="${t.id}">Delete</button>`
-          : `<button class="btn" style="font-size:12px;padding:7px 12px" data-act="dl" data-tier="${t.id}">Download</button>`}
-      </div>`).join('');
-    document.getElementById('turboModels').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-      if (b.dataset.act==='dl')  send('download_model',{tier:b.dataset.tier});
-      if (b.dataset.act==='del') send('delete_model',{tier:b.dataset.tier});
-      if (b.dataset.act==='use') send('set_turbo_model',{tier:b.dataset.tier});
-    }));
+    document.getElementById('turboStyle').value = p.style || 'natural';
+    const lite = p.lite || {};
+    document.getElementById('turboDownload').style.display = lite.installed ? 'none' : '';
+    if (!lite.installed && lite.size_gb)
+      document.getElementById('turboDlText').textContent = `One-time ${lite.size_gb} GB download to enable Turbo.`;
   }
   function onTurboProgress(p){
-    const rows = document.getElementById('turboModels').querySelectorAll('.s-row');
-    rows.forEach(row => {
-      const btn = row.querySelector(`[data-tier="${p.tier}"]`); if(!btn) return;
-      const bar = row.querySelector('.bar');
-      if (p.error){ alert(p.error); return; }
-      if (bar){ bar.style.display='block'; bar.querySelector('i').style.width=p.pct+'%'; }
-    });
+    const bar = document.querySelector('#turboDownload .bar');
+    if (p.error){ alert(p.error); return; }
+    if (bar){ bar.style.display='block'; bar.querySelector('i').style.width=p.pct+'%'; }
   }
 
   // feedback
