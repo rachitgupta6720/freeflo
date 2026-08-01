@@ -14,6 +14,20 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-01
+
+### Added
+- **Saved Prompts** — a new tab to bookmark dictations and typed prompts so you
+  can keep and reuse the ones you rely on.
+
+### Changed
+- **Turbo mode** is simpler: it now runs a single lightweight on-device model and
+  lets you pick a writing style — **Natural**, **Casual**, **Professional**, or
+  **Formal** — instead of choosing between model tiers. Natural keeps your own
+  voice with a light cleanup; the others restructure what you said into the
+  register you want without dropping any of the meaning. Upgrading reclaims up to
+  ~6.7 GB by removing the larger Turbo models that are no longer needed.
+
 ## [1.3.0] - 2026-07-30
 
 ### Added
