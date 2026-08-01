@@ -172,7 +172,11 @@
   .entry{ padding:13px 15px; margin-bottom:9px; }
   .entry .meta{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
   .entry .meta .t{ font:11px/1 var(--mono); color:var(--faint); }
-  .entry .meta .copy{ margin-left:auto; background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; }
+  .entry .meta .copy{ background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; }
+  .entry .meta .acts{ margin-left:auto; display:flex; align-items:center; gap:6px; }
+  .heart{ background:none; border:none; cursor:pointer; color:var(--faint); padding:0 2px; transition:color .15s; font-size:15px; line-height:1; }
+  .heart:hover{ color:var(--text); }
+  .heart.filled{ color:#e25555; }
   .entry .x{ -webkit-user-select:text; user-select:text; font-size:14px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
 
   /* ===== SETTINGS ===== */
@@ -215,6 +219,14 @@
   #turboStyle{ width:100%; font:13px/1 var(--sans); padding:10px 12px; border-radius:9px; cursor:pointer;
     border:1px solid var(--line-2); background:var(--surface-3); color:var(--text); }
 
+  /* ===== SAVED ===== */
+  .add-form{ margin-bottom:16px; }
+  .add-form textarea{ -webkit-user-select:text; user-select:text; width:100%; resize:none; height:90px;
+    padding:12px 14px; font:14px/1.5 var(--sans); color:var(--text); background:var(--bg-2);
+    border:1px solid var(--line-2); border-radius:10px; outline:none; margin-bottom:8px; }
+  .add-form textarea::placeholder{ color:var(--faint); }
+  .add-form .add-actions{ display:flex; gap:8px; }
+
   /* ===== FEEDBACK ===== */
   .req-form{ max-width:540px; }
   .form-label{ font:11px/1 var(--mono); letter-spacing:1px; text-transform:uppercase; color:var(--faint); margin:18px 0 8px; }
@@ -250,6 +262,9 @@
       <a data-view="history">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         History</a>
+      <a data-view="saved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg>
+        Saved</a>
     </nav>
 
     <div class="nav-label">Shape freeflo</div>
@@ -316,6 +331,26 @@
         <button class="btn ghost" id="clearBtn">Clear</button>
       </div>
       <div id="hlist"></div>
+    </section>
+
+    <!-- SAVED -->
+    <section class="view" id="v-saved">
+      <div class="head"><div><h1>Saved</h1><p>Your favourite prompts, always one click away.</p></div></div>
+      <div class="h-top">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+          <input id="ssearch" type="search" placeholder="Search saved prompts…">
+        </div>
+        <button class="btn primary" id="addSavedBtn">+ Add</button>
+      </div>
+      <div id="addForm" class="add-form" style="display:none">
+        <textarea id="addText" placeholder="Type or paste a prompt to save…"></textarea>
+        <div class="add-actions">
+          <button class="btn primary" id="addSaveBtn">Save</button>
+          <button class="btn ghost" id="addCancelBtn">Cancel</button>
+        </div>
+      </div>
+      <div id="slist"></div>
     </section>
 
     <!-- SETTINGS -->
@@ -459,6 +494,8 @@
     else if (name === 'feature_ack')    onFeatureAck(p);
     else if (name === 'turbo_status')   onTurboStatus(p);
     else if (name === 'turbo_progress') onTurboProgress(p);
+    else if (name === 'saved_prompts')  onSavedPrompts(p);
+    else if (name === 'saved_uuids')   onSavedUuids(p);
   };
 
   const LANG = { en:'English', hi:'Hindi', auto:'Auto', es:'Spanish', fr:'French', de:'German',
@@ -491,6 +528,7 @@
     views.forEach(v => v.classList.toggle('on', v.id === 'v-' + id));
     if (id === 'home')     send('get_home');
     else if (id === 'history')  send('get_history', { query: hsearch.value.trim() });
+    else if (id === 'saved')    send('get_saved_prompts', { query: ssearch.value.trim() });
     else if (id === 'settings') { send('get_shortcuts'); send('get_backup_status'); send('get_privacy'); send('get_turbo'); }
   }));
 
@@ -543,25 +581,74 @@
   const hsearch = document.getElementById('hsearch'), hlist = document.getElementById('hlist');
   const saveToggle = document.getElementById('saveToggle'), clearBtn = document.getElementById('clearBtn');
   let searchTimer = null;
+  let savedSet = new Set();
   hsearch.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => send('get_history', { query: hsearch.value.trim() }), 200); });
   saveToggle.addEventListener('click', () => { saveToggle.classList.toggle('on'); send('set_save_history', { on: saveToggle.classList.contains('on') }); });
   clearBtn.addEventListener('click', () => { if (confirm('Clear all dictation history? This cannot be undone.')) send('clear_history'); });
   function onHistory(p){
     setToggle(saveToggle, p.save_history !== false);
+    savedSet = new Set(p.saved_uuids || []);
     const entries = p.entries || [];
     if (!entries.length){ hlist.innerHTML = '<div class="empty">' + (hsearch.value.trim() ? 'No matches.' : 'No history yet. Dictate something!') + '</div>'; return; }
     hlist.innerHTML = '';
     entries.forEach(e => {
       const el = document.createElement('div'); el.className = 'card hud entry';
       const lang = LANG[e.language] || e.language || '';
+      const isSaved = savedSet.has(e.uuid);
       el.innerHTML = '<div class="meta"><span class="t">' + fmtTime(e.ts) + '</span>' +
         (lang ? '<span class="badge">' + lang + '</span>' : '') +
         (e.mode === 'test' ? '<span class="badge">test</span>' : '') +
-        '<button class="copy">Copy</button></div><div class="x"></div>';
+        '<span class="acts"><button class="heart' + (isSaved ? ' filled' : '') + '" data-history-uuid="' + e.uuid + '">&#9829;</button>' +
+        '<button class="copy">Copy</button></span></div><div class="x"></div>';
       el.querySelector('.x').textContent = e.text;
       const cp = el.querySelector('.copy');
       cp.addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(e.text); cp.textContent='Copied'; setTimeout(()=>cp.textContent='Copy', 1200); });
+      const ht = el.querySelector('.heart');
+      ht.addEventListener('click', () => {
+        if (ht.classList.contains('filled')) {
+          send('unsave_prompt', { history_uuid: e.uuid });
+        } else {
+          send('save_prompt_from_history', { text: e.text, history_uuid: e.uuid });
+        }
+      });
       hlist.appendChild(el);
+    });
+  }
+  function onSavedUuids(p){
+    savedSet = new Set(p.uuids || []);
+    document.querySelectorAll('#hlist .heart').forEach(ht => {
+      const uuid = ht.dataset.historyUuid;
+      ht.classList.toggle('filled', savedSet.has(uuid));
+    });
+  }
+
+  // saved prompts
+  const ssearch = document.getElementById('ssearch'), slist = document.getElementById('slist');
+  const addForm = document.getElementById('addForm'), addText = document.getElementById('addText');
+  let savedSearchTimer = null;
+  ssearch.addEventListener('input', () => { clearTimeout(savedSearchTimer); savedSearchTimer = setTimeout(() => send('get_saved_prompts', { query: ssearch.value.trim() }), 200); });
+  document.getElementById('addSavedBtn').addEventListener('click', () => { addForm.style.display = ''; addText.value = ''; addText.focus(); });
+  document.getElementById('addCancelBtn').addEventListener('click', () => { addForm.style.display = 'none'; });
+  document.getElementById('addSaveBtn').addEventListener('click', () => {
+    const t = addText.value.trim();
+    if (!t) return;
+    send('add_manual_prompt', { text: t });
+    addForm.style.display = 'none';
+  });
+  function onSavedPrompts(p){
+    const entries = p.entries || [];
+    if (!entries.length){ slist.innerHTML = '<div class="empty">' + (ssearch.value.trim() ? 'No matches.' : 'No saved prompts yet. Save one from History or add manually.') + '</div>'; return; }
+    slist.innerHTML = '';
+    entries.forEach(e => {
+      const el = document.createElement('div'); el.className = 'card hud entry';
+      el.innerHTML = '<div class="meta"><span class="t">' + fmtTime(e.ts) + '</span>' +
+        '<span class="acts"><button class="copy">Copy</button>' +
+        '<button class="copy" style="color:#ff8f8f">Remove</button></span></div><div class="x"></div>';
+      el.querySelector('.x').textContent = e.text;
+      const btns = el.querySelectorAll('.copy');
+      btns[0].addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(e.text); btns[0].textContent='Copied'; setTimeout(()=>btns[0].textContent='Copy', 1200); });
+      btns[1].addEventListener('click', () => { send('remove_saved_prompt', { uuid: e.uuid }); });
+      slist.appendChild(el);
     });
   }
 
