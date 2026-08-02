@@ -14,6 +14,24 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-02
+
+### Added
+- Usage-analytics and crash-report consent checkboxes now appear directly on the
+  final onboarding screen, so you can choose what to share before you finish
+  setup — both are opt-out and never include your dictated text or audio.
+
+### Changed
+- New Dock and Finder app icon — an on-brand monochrome "F" monogram that
+  replaces the old placeholder and stays legible down to 16px.
+
+### Fixed
+- Settings are now written atomically, and a config file that somehow gets
+  corrupted falls back to defaults instead of stopping the app from launching.
+- Checking Turbo status no longer briefly stalls the menu bar.
+- A dictation finishing right after you disable freeflo is no longer typed out.
+- A recording that fails to save no longer leaves a stray temporary file behind.
+
 ## [1.4.0] - 2026-08-01
 
 ### Added
