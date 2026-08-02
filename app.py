@@ -165,11 +165,7 @@ class FreefloApp(rumps.App):
             if name is None:
                 lang_menu.add(None)
                 continue
-            # First item whose code matches gets the checkmark
-            already_checked = any(
-                c == current_lang for _, c in self._lang_menu_items.values()
-            )
-            prefix = '✓  ' if (code == current_lang and not already_checked) else '    '
+            prefix = '✓  ' if code == current_lang else '    '
             item = rumps.MenuItem(
                 prefix + name,
                 callback=lambda sender, c=code, n=name: self._set_language(c, n),
@@ -463,6 +459,9 @@ class FreefloApp(rumps.App):
             self._edit_saved_prompt(body)
 
     def _send_turbo_status(self):
+        threading.Thread(target=self._send_turbo_status_now, daemon=True).start()
+
+    def _send_turbo_status_now(self):
         from engine import models as _models
         s = cfg.load()
         m = _models.MODELS['lite']
@@ -1156,8 +1155,9 @@ class FreefloApp(rumps.App):
                  settings.get('analytics_enabled'), settings.get('crash_enabled'),
                  settings.get('profile_role'))
         telemetry.identify()
+        from engine import permissions as _perms
         telemetry.capture('onboarding_completed', {
-            'mic': bool(AXIsProcessTrusted()),   # best-effort snapshot
+            'mic': _perms.mic_status() == 'authorized',
             'signed_in': gauth.is_connected(),
             'role': settings.get('profile_role'),
             'analytics': settings.get('analytics_enabled'),
@@ -1298,10 +1298,13 @@ class FreefloApp(rumps.App):
                 settings = cfg.load()
                 if settings.get('turbo_enabled') and refiner.is_ready():
                     text = refiner.refine(text, settings.get('turbo_style', 'natural'))
-                inject(text)
-                self._set_state('idle', f'"{text[:40]}{"…" if len(text) > 40 else ""}"')
-                telemetry.dictation_completed(
-                    mode, cfg.load().get('language'), duration, len(text))
+                if not self._enabled:
+                    self._set_state('disabled', 'Dictation disabled')
+                else:
+                    inject(text)
+                    self._set_state('idle', f'"{text[:40]}{"…" if len(text) > 40 else ""}"')
+                    telemetry.dictation_completed(
+                        mode, cfg.load().get('language'), duration, len(text))
             else:
                 self._set_state('idle', 'Nothing heard — try again')
             if mode != 'ob_test':   # onboarding tests aren't saved to history
@@ -1314,7 +1317,10 @@ class FreefloApp(rumps.App):
             elif mode == 'ob_test':
                 self._push_ob('ob_test_result', {'text': '', 'note': f'Error: {e}'})
         finally:
-            self._busy_lock.release()
+            try:
+                self._busy_lock.release()
+            except RuntimeError:
+                pass
 
     def _log_history(self, text, mode, duration):
         """Record a transcription to the local DB, honoring the save toggle.

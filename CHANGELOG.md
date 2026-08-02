@@ -50,10 +50,10 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [1.2.0] - 2026-07-23
 
-## [1.1.0] - 2026-07-14
+### Changed
+- Internal improvements and dependency updates.
 
-_Changes landing here will roll into the next release. The app binary is
-unchanged since 1.0.0; the entries below are website/repository changes._
+## [1.1.0] - 2026-07-14
 
 ### Added
 - Optional Google Drive backup of dictation history (off by default): syncs to
@@ -91,5 +91,9 @@ First public, open-source release.
 - Open-source project files: MIT `LICENSE`, `README.md`, `requirements.txt`,
   `.gitignore`.
 
-[Unreleased]: https://github.com/rachitgupta6720/freeflo/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/rachitgupta6720/freeflo/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/rachitgupta6720/freeflo/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/rachitgupta6720/freeflo/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/rachitgupta6720/freeflo/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/rachitgupta6720/freeflo/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/rachitgupta6720/freeflo/releases/tag/v1.0.0

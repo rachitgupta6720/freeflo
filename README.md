@@ -53,7 +53,7 @@ sh ./models/download-ggml-model.sh small
 ### 2. Install freeflo
 
 ```bash
-git clone https://github.com/<your-username>/freeflo ~/freeflo
+git clone https://github.com/rachitgupta6720/freeflo ~/freeflo
 cd ~/freeflo
 python3 -m venv .venv
 source .venv/bin/activate

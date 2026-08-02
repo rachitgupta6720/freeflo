@@ -237,8 +237,14 @@ def load():
     if not os.path.exists(_CONFIG_FILE):
         save(_DEFAULTS.copy())
         return _DEFAULTS.copy()
-    with open(_CONFIG_FILE) as f:
-        data = json.load(f)
+    try:
+        with open(_CONFIG_FILE) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        import logging
+        logging.getLogger('freeflo.config').warning(
+            'config.json is corrupt — reverting to defaults')
+        return _DEFAULTS.copy()
     return _normalize_turbo({**_DEFAULTS, **data})
 
 
@@ -255,8 +261,10 @@ def _normalize_turbo(data):
 
 def save(data):
     os.makedirs(_CONFIG_DIR, exist_ok=True)
-    with open(_CONFIG_FILE, 'w') as f:
+    tmp = _CONFIG_FILE + '.tmp'
+    with open(tmp, 'w') as f:
         json.dump(data, f, indent=2)
+    os.replace(tmp, _CONFIG_FILE)
 
 
 def migrate_turbo_v2():
