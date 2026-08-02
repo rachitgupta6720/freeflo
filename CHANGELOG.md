@@ -109,7 +109,8 @@ First public, open-source release.
 - Open-source project files: MIT `LICENSE`, `README.md`, `requirements.txt`,
   `.gitignore`.
 
-[Unreleased]: https://github.com/rachitgupta6720/freeflo/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/rachitgupta6720/freeflo/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/rachitgupta6720/freeflo/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/rachitgupta6720/freeflo/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/rachitgupta6720/freeflo/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/rachitgupta6720/freeflo/compare/v1.1.0...v1.2.0
