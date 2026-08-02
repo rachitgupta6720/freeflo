@@ -5,7 +5,7 @@
 
 This document is the "why" behind freeflo. It explains what we are trying to build,
 the beliefs that shape every decision, and the arc from where we are today to where we
-are going. A visual version of this same story lives at [`design/vision.html`](design/vision.html).
+are going.
 
 ---
 
@@ -94,12 +94,8 @@ voice and your data on your own machine. The visual language says *serious tool 
 endure* — it looks at home on macOS while remaining unmistakably freeflo. "Designed to
 disappear."
 
-**The design system is governed by [`design/DESIGN_SYSTEM.md`](design/DESIGN_SYSTEM.md) —
-read it before building or changing any surface.** Reference implementations:
-[`design/design-system.html`](design/design-system.html) (the full system as an apple.com-style
-page), [`design/brand.html`](design/brand.html) (locked A+1 lockup),
-[`design/onboarding.html`](design/onboarding.html), [`design/app-window.html`](design/app-window.html),
-and the public site [`docs/index.html`](docs/index.html).
+The design specification is maintained as an internal document. The public site lives at
+[`docs/index.html`](docs/index.html).
 
 ## How we listen
 
@@ -115,7 +111,4 @@ the product alongside them. Every request is a signal about which domain to open
 
 ## Where the roadmap lives
 
-The concrete, phased build plan (reliability, onboarding + consent, telemetry, backup
-hardening, theming, and the groundwork toward the assistant domains) is tracked in
-[`.context/build-plan.md`](.context/build-plan.md). This document is the *why*; that one is
-the *what and when*.
+The concrete, phased build plan is tracked internally. This document is the *why*.

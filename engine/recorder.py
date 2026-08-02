@@ -52,5 +52,12 @@ class Recorder:
         tmp = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
         tmp_path = tmp.name
         tmp.close()  # Close handle before wav_write opens the same path
-        wav_write(tmp_path, SAMPLE_RATE, audio)
+        try:
+            wav_write(tmp_path, SAMPLE_RATE, audio)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
         return tmp_path

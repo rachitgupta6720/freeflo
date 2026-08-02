@@ -40,7 +40,7 @@ step(){ echo; echo "▸ $*"; }
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "Tag $TAG already exists."
 gh release view "$TAG" >/dev/null 2>&1 && die "Release $TAG already exists on GitHub."
 [ -x "$HOME/whisper.cpp/build-static/bin/whisper-cli" ] || die "whisper-cli not found — build whisper.cpp first (see README)."
-[ -x "$HOME/llama.cpp/build-static/bin/llama-server" ] || die "llama-server (static) not found — build llama.cpp with build-static first (Turbo mode; see PRD §12)."
+[ -x "$HOME/llama.cpp/build-static/bin/llama-server" ] || die "llama-server (static) not found — build llama.cpp with build-static first (see README for Turbo mode setup)."
 
 step "Releasing freeflo $TAG  ($DATE)"
 

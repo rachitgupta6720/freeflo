@@ -129,6 +129,11 @@
   .transcript{ margin-top:auto; font-size:16px; line-height:1.55; min-height:52px; -webkit-user-select:text; user-select:text; }
   .transcript.empty{ color:var(--faint); }
 
+  /* consent */
+  .consent-row{ margin-top:20px; display:flex; flex-direction:column; gap:8px; }
+  .consent-row label{ display:flex; align-items:center; gap:9px; font-size:12px; color:var(--muted); cursor:pointer; }
+  .consent-row input[type=checkbox]{ width:14px; height:14px; accent-color:var(--hi); flex:none; }
+
   /* footer */
   .foot{ display:flex; align-items:center; gap:14px; padding-top:18px; margin-top:14px; border-top:1px solid var(--line); }
   .hint{ font:11px/1 var(--mono); color:var(--faint); letter-spacing:.5px; }
@@ -222,6 +227,10 @@
           <div class="transcript empty" id="transcript">Your transcription will appear here…</div>
         </div>
       </div>
+      <div class="consent-row">
+        <label><input type="checkbox" id="chkAnalytics" checked>Anonymous usage analytics — helps improve freeflo (no personal data)</label>
+        <label><input type="checkbox" id="chkCrash" checked>Crash reports — technical stack traces only, no content or audio</label>
+      </div>
     </section>
   </div>
 
@@ -259,6 +268,8 @@
 
   const state = { mic_granted:false, accessibility:false };
   const consent = { analytics:true, crash:true };
+  document.getElementById('chkAnalytics').addEventListener('change', e => { consent.analytics = e.target.checked; });
+  document.getElementById('chkCrash').addEventListener('change', e => { consent.crash = e.target.checked; });
 
   function render(){
     screens.forEach((s,n)=> s.classList.toggle('on', n===i));
