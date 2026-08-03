@@ -14,6 +14,8 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-08-03
+
 ### Fixed
 - **Dictation could freeze permanently on the ⏳ icon.** Stopping a recording
   occasionally deadlocked deep inside macOS's audio system, which killed the
