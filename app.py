@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import queue
 import logging
 import threading
 import subprocess
@@ -9,7 +10,7 @@ from ApplicationServices import AXIsProcessTrusted, AXIsProcessTrustedWithOption
 
 import config as cfg
 from engine.recorder import Recorder
-from engine.transcriber import transcribe
+from engine.transcriber import transcribe, timeout_for
 from engine.injector import inject
 from engine import history, saved, gauth, backup, logs, updater, telemetry
 from engine import refiner, model_manager
@@ -28,6 +29,28 @@ _ACCESSIBILITY_URL = (
     'x-apple.systempreferences:'
     'com.apple.preference.security?Privacy_Accessibility'
 )
+
+_RESTART_ITEM_TITLE = '↺  Restart to Activate'
+_ACCESS_ITEM_TITLE = '⚠️  Grant Accessibility Permission'
+_RECONNECT_ITEM_TITLE = '⚠️  Reconnect Google Backup…'
+
+# How long the mic stream stays open after a dictation. Holding it open avoids a
+# PortAudio teardown per dictation (see engine/recorder), but macOS shows the
+# orange mic indicator for as long as it is open, so keep the window short.
+_MIC_IDLE_CLOSE_SEC = 30.0
+
+# Grace added on top of the whisper timeout before the stall watchdog decides a
+# 'processing' cycle is never coming back. Covers Turbo refine (8 s) + paste.
+_STALL_GRACE_SEC = 45.0
+
+# An audio operation that hasn't returned in this long means CoreAudio is wedged.
+# A wedged native thread can't be killed, so we stop queueing and ask for a restart.
+_AUDIO_OP_STUCK_SEC = 25.0
+
+# Failed backup syncs retry with exponential backoff instead of a fixed 2 min —
+# a long outage used to write a warning every 120 s all night.
+_BACKUP_RETRY_MIN = 120.0
+_BACKUP_RETRY_MAX = 1800.0
 
 # (name shown in menu, whisper language code)
 # 'auto' removes the -l flag — whisper detects the language from audio.
@@ -95,19 +118,46 @@ class FreefloApp(rumps.App):
         self._is_recording = False    # guarded by _toggle_lock
         self._record_mode = None      # 'ptt' | 'toggle' | None, guarded by _toggle_lock
 
+        # Every record→transcribe cycle gets an id. A stale worker — or the
+        # stall watchdog — must never release _busy_lock or overwrite the status
+        # of a cycle that has already been superseded, or two cycles could run
+        # at once and both paste into the user's document.
+        self._cycle = 0               # guarded by _toggle_lock
+        self._cycle_owner = None      # cycle holding _busy_lock, guarded by _toggle_lock
+
+        # Deadlines polled by _poll_state on the main thread. None = not armed.
+        self._processing_deadline = None    # stall watchdog
+        self._audio_idle_deadline = None    # release the mic after idling
+        self._audio_wedged = False          # CoreAudio stuck; restart required
+
         # Guards against overlapping backup syncs (e.g. rapid-fire dictation).
         # _backup_pending coalesces a sync requested while one is already
         # running, so the last utterance before quit is never left unsynced.
         self._backup_lock = threading.Lock()
         self._backup_pending = False
         self._backup_retry_scheduled = False
+        self._backup_retry_delay = _BACKUP_RETRY_MIN
+        # Worker → main thread hand-off for the reconnect menu item, which (like
+        # every menu mutation and notification) may only be touched there.
+        self._reauth_dirty = False
+        self._hide_reconnect_dirty = False
         # Local snapshot writer — same coalescing pattern, off the dictation path.
         self._snapshot_lock = threading.Lock()
         self._snapshot_pending = False
 
         ptt = cfg.resolve_key(settings.get('ptt_key', 'left_option'))
         tog = cfg.resolve_key(settings.get('toggle_key', 'right_option'))
+        # audio-ctl is the ONLY thread allowed to touch self._recorder. PortAudio
+        # teardown can block for a long time inside CoreAudio, and doing that on
+        # the hotkey tap thread (or the main thread, via the window's mic test)
+        # wedges the app permanently — see .context/audio-hang-fix-plan.md.
         self._recorder = Recorder()
+        self._audio_q = queue.Queue()
+        self._audio_op_started = None   # monotonic time the running op began
+        self._audio_thread = threading.Thread(
+            target=self._audio_worker, name='audio-ctl', daemon=True)
+        self._audio_thread.start()
+
         self._hotkey = HotkeyListener(
             on_ptt_start=self._on_ptt_start,     # push-to-talk key pressed
             on_ptt_stop=self._on_ptt_stop,       # push-to-talk key released
@@ -126,12 +176,18 @@ class FreefloApp(rumps.App):
         self._ui = None   # lazily-created WindowController (holds ObjC objects)
         self._status_item = rumps.MenuItem('● Ready')
         self._access_item = rumps.MenuItem(
-            '⚠️  Grant Accessibility Permission',
+            _ACCESS_ITEM_TITLE,
             callback=self._open_accessibility,
         )
         self._restart_item = rumps.MenuItem(
-            '↺  Restart to Activate',
+            _RESTART_ITEM_TITLE,
             callback=self._restart_app,
+        )
+        # Shown only when the Google refresh token is dead — retrying can't fix
+        # that, so the user needs an explicit way back in.
+        self._reconnect_item = rumps.MenuItem(
+            _RECONNECT_ITEM_TITLE,
+            callback=self._reconnect_google,
         )
 
         # Self-update. The title flips to a download prompt once a newer release
@@ -197,6 +253,10 @@ class FreefloApp(rumps.App):
             self.menu.add(self._access_item)
             self.menu.add(self._restart_item)
 
+        # A dead Google sign-in survives restarts, so the way back in must too.
+        if settings.get('backup_auth_expired'):
+            self.menu.add(self._reconnect_item)
+
         # Start the hotkey only when Accessibility is granted.
         if self._enabled and self._has_accessibility:
             self._hotkey.start()
@@ -234,6 +294,35 @@ class FreefloApp(rumps.App):
             return self._state, self._last_status
 
     # ------------------------------------------------------------------
+    # Cycle bookkeeping
+    #
+    # _busy_lock is only ever released through _finish_cycle, so a worker that
+    # was superseded (or the stall watchdog stepping in) can never free a lock a
+    # newer recording already owns.
+    # ------------------------------------------------------------------
+
+    def _finish_cycle(self, cycle, state='idle', status=None):
+        """End `cycle`: release the busy lock, disarm the watchdog and (unless
+        `state` is None) set the final icon/status. No-op if `cycle` is stale.
+        Returns True if this call was the one that ended the cycle."""
+        with self._toggle_lock:
+            if cycle is None or self._cycle_owner != cycle:
+                return False
+            self._cycle_owner = None
+            self._processing_deadline = None
+            try:
+                self._busy_lock.release()
+            except RuntimeError:
+                pass   # already released — nothing to undo
+        if state:
+            self._set_state(state, status)
+        return True
+
+    def _is_current_cycle(self, cycle):
+        with self._toggle_lock:
+            return cycle is not None and self._cycle_owner == cycle
+
+    # ------------------------------------------------------------------
     # Timer — runs on main thread, safe to update UI
     # ------------------------------------------------------------------
 
@@ -260,6 +349,22 @@ class FreefloApp(rumps.App):
                 rumps.notification('freeflo', self._update_status, '')
                 self._update_status = None
 
+        # Same worker → main-thread hand-off for a dead Google refresh token.
+        if self._reauth_dirty:
+            self._reauth_dirty = False
+            self._show_menu_item(self._reconnect_item, _RECONNECT_ITEM_TITLE)
+            rumps.notification(
+                'freeflo', 'Google Backup disconnected',
+                'Your Google sign-in expired. Open the menu to reconnect — '
+                'dictation and local history are unaffected.',
+            )
+        if self._hide_reconnect_dirty:
+            self._hide_reconnect_dirty = False
+            if _RECONNECT_ITEM_TITLE in self.menu:
+                del self.menu[_RECONNECT_ITEM_TITLE]
+
+        self._check_deadlines()
+
         # Re-check Accessibility every ~3 s. This is a cheap, crash-safe call
         # (unlike the old CGEventTap probe, which crashed natively — see the
         # git history / crash reports). It keeps the "granted while running"
@@ -270,8 +375,8 @@ class FreefloApp(rumps.App):
         self._access_check_counter = 0
 
         trusted = AXIsProcessTrusted()
-        has_access_warning = '⚠️  Grant Accessibility Permission' in self.menu
-        has_restart        = '↺  Restart to Activate' in self.menu
+        has_access_warning = _ACCESS_ITEM_TITLE in self.menu
+        has_restart        = _RESTART_ITEM_TITLE in self.menu
 
         if not trusted and not has_access_warning:
             self.menu.add(self._access_item)
@@ -281,7 +386,7 @@ class FreefloApp(rumps.App):
             # Accessibility just granted. macOS does not update the accessibility
             # context for a running process — a restart is required for the tap
             # to see the new permission. Keep ↺ visible and notify.
-            del self.menu['⚠️  Grant Accessibility Permission']
+            del self.menu[_ACCESS_ITEM_TITLE]
             if not has_restart:
                 self.menu.add(self._restart_item)
             rumps.notification(
@@ -289,6 +394,58 @@ class FreefloApp(rumps.App):
                 subtitle='Accessibility granted',
                 message="Now click '↺ Restart to Activate' in the menu.",
             )
+
+    def _show_menu_item(self, item, title):
+        """Add a conditional menu item once. Main thread only."""
+        if title not in self.menu:
+            self.menu.add(item)
+
+    def _check_deadlines(self):
+        """Stall watchdog + idle mic release + wedged-audio detection. Runs on
+        the main thread from _poll_state; everything it touches is either atomic
+        or goes through _finish_cycle."""
+        now = time.monotonic()
+
+        # Nothing else can pull us out of 'processing': _transcribe_worker is the
+        # only exit, so if it dies or blocks the icon stays on ⏳ forever. That is
+        # the failure users reported. Force the cycle closed.
+        deadline = self._processing_deadline
+        if deadline is not None and now > deadline:
+            self._processing_deadline = None
+            state, _ = self._get_state()
+            with self._toggle_lock:
+                cycle = self._cycle_owner
+                self._is_recording = False
+                self._record_mode = None
+            log.error('Dictation stalled in state=%s (cycle=%s) — recovering',
+                      state, cycle)
+            if not self._finish_cycle(cycle, 'idle', 'Timed out — try again'):
+                self._set_state('idle', 'Ready')
+
+        # Release the mic once we've been idle a while, so the macOS mic
+        # indicator doesn't stay lit for as long as freeflo is running.
+        idle = self._audio_idle_deadline
+        if idle is not None and now > idle:
+            self._audio_idle_deadline = None
+            self._audio_q.put((self._audio_close, ()))
+
+        # A CoreAudio call that never returns can't be cancelled or killed, so
+        # once audio-ctl is stuck the only honest thing to do is say so and stop
+        # pretending dictation still works.
+        if not self._audio_wedged:
+            started = self._audio_op_started
+            stuck = started is not None and now - started > _AUDIO_OP_STUCK_SEC
+            if stuck or not self._audio_thread.is_alive():
+                self._audio_wedged = True
+                log.error('Audio thread wedged (stuck=%s alive=%s) — restart needed',
+                          stuck, self._audio_thread.is_alive())
+                with self._toggle_lock:
+                    cycle = self._cycle_owner
+                    self._is_recording = False
+                    self._record_mode = None
+                self._finish_cycle(cycle, None)   # never leave _busy_lock stranded
+                self._show_menu_item(self._restart_item, _RESTART_ITEM_TITLE)
+                self._set_state('idle', 'Audio stalled — restart freeflo')
 
     # ------------------------------------------------------------------
     # Menu callbacks
@@ -303,16 +460,19 @@ class FreefloApp(rumps.App):
         else:
             self._hotkey.stop()
             # Clean up any in-flight recording so _busy_lock is never stranded.
+            # Ending the cycle also invalidates any audio work already queued, so
+            # a start that hasn't run yet can't switch the mic back on.
             with self._toggle_lock:
                 was_recording = self._is_recording
                 self._is_recording = False
                 self._record_mode = None
-            self._recorder.stop_and_save()   # close mic even if not actively recording
-            if was_recording:
-                try:
-                    self._busy_lock.release()
-                except RuntimeError:
-                    pass  # transcription thread already released it — fine
+                cycle = self._cycle_owner if was_recording else None
+            self._finish_cycle(cycle, None)
+            # Release the mic now rather than waiting out the idle window. Queued,
+            # never inline: this used to call straight into PortAudio on the main
+            # thread, where a blocking teardown freezes the whole menu-bar app.
+            self._audio_idle_deadline = None
+            self._audio_q.put((self._audio_close, ()))
             sender.title = 'Enable Dictation'
             self._set_state('disabled', 'Dictation disabled')
 
@@ -652,6 +812,7 @@ class FreefloApp(rumps.App):
             'email': settings.get('backup_account_email'),
             'last_synced': settings.get('backup_last_synced'),
             'syncing': self._backup_lock.locked(),
+            'reauth': bool(settings.get('backup_auth_expired')),
         }
         if extra:
             payload.update(extra)
@@ -672,7 +833,10 @@ class FreefloApp(rumps.App):
         settings = cfg.load()
         settings['backup_account_email'] = email
         settings['backup_enabled'] = True
+        settings['backup_auth_expired'] = False   # fresh credentials
         cfg.save(settings)
+        self._backup_retry_delay = _BACKUP_RETRY_MIN
+        self._hide_reconnect_dirty = True
         telemetry.capture('backup_connected', {'source': 'settings'})
         self._send_backup_status()
         self._maybe_sync_backup(manual=True)
@@ -692,7 +856,9 @@ class FreefloApp(rumps.App):
         settings['backup_enabled'] = False
         settings['backup_account_email'] = None
         settings['backup_last_synced'] = None
+        settings['backup_auth_expired'] = False   # no credentials to be stale now
         cfg.save(settings)
+        self._hide_reconnect_dirty = True
         self._send_backup_status()
 
     def _maybe_sync_backup(self, manual=False):
@@ -704,6 +870,13 @@ class FreefloApp(rumps.App):
             if manual:
                 self._send_backup_status({'error': 'Connect Google Backup first.'})
             return
+        # A dead refresh token can't be retried around, so automatic triggers
+        # stand down until the user reconnects. An explicit "Sync now" always
+        # gets one more attempt — this flag must never become a dead end.
+        if settings.get('backup_auth_expired'):
+            if not manual:
+                return
+            self._clear_backup_auth_expired()
         if not self._backup_lock.acquire(blocking=False):
             # A sync is already running; ask it to run once more when it
             # finishes so a dictation that landed mid-sync isn't left behind.
@@ -726,29 +899,60 @@ class FreefloApp(rumps.App):
                     break
                 self._backup_pending = False
         except Exception as e:
-            log.warning('Backup sync failed: %s', e)
             self._backup_lock.release()
+            if gauth.is_auth_expired(e):
+                # Terminal: the refresh token is revoked or expired. Retrying
+                # every 2 minutes forever (which it used to do, for 22 hours
+                # straight) can't fix it — surface it and stand down.
+                log.warning('Google Backup needs reconnecting: %s', e)
+                settings = cfg.load()
+                settings['backup_auth_expired'] = True
+                cfg.save(settings)
+                self._reauth_dirty = True   # main thread shows menu + notification
+                self._send_backup_status(
+                    {'error': 'Google sign-in expired — reconnect to resume backup.',
+                     'reauth': True})
+                return
+            log.warning('Backup sync failed: %s', e)
             self._send_backup_status({'error': f'Sync failed: {e}'})
             self._schedule_backup_retry()
             return
         settings = cfg.load()
         settings['backup_last_synced'] = result['synced_at']
         cfg.save(settings)
+        self._backup_retry_delay = _BACKUP_RETRY_MIN   # recovered — reset backoff
         self._backup_lock.release()
         self._send_backup_status()
 
-    def _schedule_backup_retry(self, delay=120.0):
-        """After a failed sync, retry once after a delay so unsynced entries
-        aren't stranded until the next dictation or launch. Coalesced so
-        repeated failures don't stack timers."""
+    def _clear_backup_auth_expired(self):
+        settings = cfg.load()
+        if settings.get('backup_auth_expired'):
+            settings['backup_auth_expired'] = False
+            cfg.save(settings)
+        self._backup_retry_delay = _BACKUP_RETRY_MIN
+
+    def _reconnect_google(self, _):
+        """Menu item shown when the stored Google credentials died."""
+        self._clear_backup_auth_expired()
+        threading.Thread(target=self._connect_google, daemon=True).start()
+
+    def _schedule_backup_retry(self):
+        """After a transient failure, retry later so unsynced entries aren't
+        stranded until the next dictation or launch. Coalesced so repeated
+        failures don't stack timers, and backed off so a long outage doesn't
+        write a warning every 2 minutes all night."""
         if self._backup_retry_scheduled:
             return
         self._backup_retry_scheduled = True
+        delay = self._backup_retry_delay
+        self._backup_retry_delay = min(_BACKUP_RETRY_MAX, delay * 2)
 
         def _retry():
             self._backup_retry_scheduled = False
             self._maybe_sync_backup()
-        threading.Timer(delay, _retry).start()
+        t = threading.Timer(delay, _retry)
+        t.daemon = True   # a pending retry must never hold up quitting
+        t.start()
 
     # ------------------------------------------------------------------
     # Local snapshot safety net + clean-quit flush
@@ -781,8 +985,11 @@ class FreefloApp(rumps.App):
 
     def _flush_backup_blocking(self):
         try:
+            settings = cfg.load()
+            if settings.get('backup_auth_expired'):
+                return   # would fail; don't spend the quit budget on it
             has_dirty = history.dirty_entries() or saved.dirty_entries()
-            if (cfg.load().get('backup_enabled') and has_dirty
+            if (settings.get('backup_enabled') and has_dirty
                     and gauth.is_connected()):
                 backup.sync()
                 backup.sync_saved()
@@ -800,6 +1007,11 @@ class FreefloApp(rumps.App):
         t = threading.Thread(target=self._flush_backup_blocking, daemon=True)
         t.start()
         t.join(timeout=6.0)
+        # Release the mic on the way out, but never let a wedged CoreAudio call
+        # make freeflo unquittable — bounded wait, then quit regardless.
+        self._audio_q.put((self._audio_close, ()))
+        self._audio_q.put(None)
+        self._audio_thread.join(timeout=2.0)
         try:
             telemetry.flush()
         except Exception:
@@ -1136,7 +1348,10 @@ class FreefloApp(rumps.App):
             settings['backup_account_email'] = info['email']
         if info.get('name'):
             settings['profile_name'] = info['name']
+        settings['backup_auth_expired'] = False   # fresh credentials
         cfg.save(settings)
+        self._backup_retry_delay = _BACKUP_RETRY_MIN
+        self._hide_reconnect_dirty = True
         self._ob_connected = True   # refresh the cache after a successful sign-in
         telemetry.capture('backup_connected', {'source': 'onboarding'})
         self._push_ob('ob_signin_result',
@@ -1188,24 +1403,35 @@ class FreefloApp(rumps.App):
         self._set_state(self._state, f'Language: {name}')
 
     # ------------------------------------------------------------------
-    # Recording engine — shared by both hotkeys. Called from the event-tap
-    # thread (callbacks never overlap each other); _toggle_lock guards against
-    # the menu Disable path racing these.
+    # Recording engine — shared by both hotkeys and by the window/onboarding
+    # mic tests. _begin_recording / _end_recording run on the caller's thread:
+    # the event-tap thread for hotkeys, the MAIN thread for the mic tests. So
+    # they only do fast, pure-Python bookkeeping (_toggle_lock guards it against
+    # the menu Disable path) and hand every microphone operation to audio-ctl.
+    # Nothing here may block: a stalled tap callback kills the hotkey outright,
+    # and a stalled main thread freezes the entire app.
     # ------------------------------------------------------------------
 
     def _begin_recording(self, mode):
         """Acquire the busy lock and start recording. Returns True if started."""
+        if self._audio_wedged:
+            self._set_state(self._state, 'Audio stalled — restart freeflo')
+            return False
         with self._toggle_lock:
             if self._is_recording:
                 return False
             if not self._busy_lock.acquire(blocking=False):
                 self._set_state(self._state, 'Busy — finishing last one…')
                 return False
+            self._cycle += 1
+            cycle = self._cycle
+            self._cycle_owner = cycle
             self._is_recording = True
             self._record_mode = mode
         self._record_start = time.monotonic()
+        self._audio_idle_deadline = None    # cancel a pending mic release
         self._set_state('recording', 'Recording…')
-        self._recorder.start()
+        self._audio_q.put((self._audio_start, (cycle, mode)))
         return True
 
     def _end_recording(self, mode, transcribe):
@@ -1215,32 +1441,115 @@ class FreefloApp(rumps.App):
                 return
             self._is_recording = False
             self._record_mode = None
+            cycle = self._cycle_owner
 
         if not transcribe:
-            self._recorder.stop_and_save()   # discard
             self._set_state('idle', 'Cancelled')
-            try:
-                self._busy_lock.release()
-            except RuntimeError:
-                pass
+            self._audio_q.put((self._audio_discard, (cycle,)))
             return
 
         duration = max(0.0, time.monotonic() - getattr(self, '_record_start', time.monotonic()))
         self._set_state('processing', 'Transcribing…')
-        wav_path = self._recorder.stop_and_save()
+        # Provisional stall deadline covering the hand-off itself; _audio_stop
+        # replaces it with one sized to the actual transcription.
+        self._processing_deadline = time.monotonic() + 60.0
+        self._audio_q.put((self._audio_stop, (cycle, mode, duration)))
+
+    # ------------------------------------------------------------------
+    # audio-ctl — the only thread that touches self._recorder
+    # ------------------------------------------------------------------
+
+    def _audio_worker(self):
+        """Serialise every microphone operation onto one thread, in order.
+        Ordering matters: a start must never overtake the stop before it."""
+        while True:
+            item = self._audio_q.get()
+            try:
+                if item is None:
+                    return          # sentinel from _quit
+                fn, args = item
+                self._audio_op_started = time.monotonic()
+                try:
+                    fn(*args)
+                except Exception:
+                    log.exception('Audio operation %s failed',
+                                  getattr(fn, '__name__', fn))
+                finally:
+                    self._audio_op_started = None
+            finally:
+                self._audio_q.task_done()
+
+    def _audio_start(self, cycle, mode):
+        """Open the mic for `cycle`, unless it was superseded on the way here."""
+        if not self._is_current_cycle(cycle):
+            return
+        if not self._enabled:
+            with self._toggle_lock:
+                self._is_recording = False
+                self._record_mode = None
+            self._finish_cycle(cycle, 'disabled', 'Dictation disabled')
+            return
+        try:
+            self._recorder.start()
+        except Exception as e:
+            # The mic-test UIs wait on a result, so a failure has to reach them —
+            # it used to surface as an exception on the calling thread.
+            log.exception('Could not start recording')
+            note = f'Mic unavailable: {e}'
+            with self._toggle_lock:
+                self._is_recording = False
+                self._record_mode = None
+            if mode == 'test':
+                self._push_ui('test_result', {'text': '', 'note': note})
+            elif mode == 'ob_test':
+                self._push_ob('ob_test_result', {'text': '', 'note': note})
+            self._finish_cycle(cycle, 'idle', note)
+
+    def _audio_discard(self, cycle):
+        """Drop a cancelled recording. The state is already back to idle."""
+        try:
+            self._recorder.stop_and_save()
+        except Exception:
+            log.exception('Discarding the recording failed')
+        self._arm_mic_idle_close()
+        self._finish_cycle(cycle, None)
+
+    def _audio_stop(self, cycle, mode, duration):
+        """Save the recording and hand it to a transcription thread."""
+        try:
+            wav_path = self._recorder.stop_and_save()
+        except Exception:
+            log.exception('Saving the recording failed')
+            wav_path = None
+        self._arm_mic_idle_close()
+
         if wav_path:
+            self._processing_deadline = (
+                time.monotonic() + timeout_for(duration) + _STALL_GRACE_SEC)
             threading.Thread(
                 target=self._transcribe_worker,
-                args=(wav_path, mode, duration),
+                args=(wav_path, mode, duration, cycle),
                 daemon=True,
             ).start()
-        else:
-            self._set_state('idle', 'Too short — try again')
-            if mode == 'test':
-                self._push_ui('test_result', {'text': '', 'note': 'Too short — try again'})
-            elif mode == 'ob_test':
-                self._push_ob('ob_test_result', {'text': '', 'note': 'Too short — try again'})
-            self._busy_lock.release()
+            return
+
+        note = 'Too short — try again'
+        if mode == 'test':
+            self._push_ui('test_result', {'text': '', 'note': note})
+        elif mode == 'ob_test':
+            self._push_ob('ob_test_result', {'text': '', 'note': note})
+        self._finish_cycle(cycle, 'idle', note)
+
+    def _audio_close(self):
+        """Release the mic. The one remaining call that can block inside
+        CoreAudio, which is exactly why it runs here and nowhere else."""
+        try:
+            self._recorder.close()
+        except Exception:
+            log.exception('Closing the mic failed')
+
+    def _arm_mic_idle_close(self):
+        self._audio_idle_deadline = time.monotonic() + _MIC_IDLE_CLOSE_SEC
 
     # ------------------------------------------------------------------
     # Hotkey callbacks — called from the event-tap thread
@@ -1281,14 +1590,18 @@ class FreefloApp(rumps.App):
     # Transcription — runs in background thread
     # ------------------------------------------------------------------
 
-    def _transcribe_worker(self, wav_path, mode, duration):
+    def _transcribe_worker(self, wav_path, mode, duration, cycle):
         """Transcribe on a background thread. In 'test' mode the result is shown
         in the window (no paste); otherwise it is injected at the cursor. Either
-        way a successful transcription is logged to history."""
+        way a successful transcription is logged to history.
+
+        The final state is applied once, via _finish_cycle, so that if the stall
+        watchdog already gave up on this cycle we don't stomp on whatever has
+        happened since."""
+        final_state, final_status = 'idle', 'Ready'
         try:
-            text = transcribe(wav_path)
+            text = transcribe(wav_path, duration)
             if mode in ('test', 'ob_test'):
-                self._set_state('idle', 'Ready')
                 payload = {'text': text or ''}
                 if mode == 'ob_test':
                     self._push_ob('ob_test_result', payload)
@@ -1299,28 +1612,31 @@ class FreefloApp(rumps.App):
                 if settings.get('turbo_enabled') and refiner.is_ready():
                     text = refiner.refine(text, settings.get('turbo_style', 'natural'))
                 if not self._enabled:
-                    self._set_state('disabled', 'Dictation disabled')
+                    final_state, final_status = 'disabled', 'Dictation disabled'
+                elif not self._is_current_cycle(cycle):
+                    # The stall watchdog already gave up on this cycle and the
+                    # user has moved on. Pasting now could land in a different
+                    # app entirely, so don't — the text is still in history.
+                    log.warning('Dropping a late transcript (cycle %s superseded)', cycle)
+                    final_status = 'Timed out — saved to history'
                 else:
                     inject(text)
-                    self._set_state('idle', f'"{text[:40]}{"…" if len(text) > 40 else ""}"')
+                    final_status = f'"{text[:40]}{"…" if len(text) > 40 else ""}"'
                     telemetry.dictation_completed(
                         mode, cfg.load().get('language'), duration, len(text))
             else:
-                self._set_state('idle', 'Nothing heard — try again')
+                final_status = 'Nothing heard — try again'
             if mode != 'ob_test':   # onboarding tests aren't saved to history
                 self._log_history(text, mode, duration)
         except Exception as e:
             log.exception('Transcription failed (mode=%s)', mode)
-            self._set_state('idle', f'Error: {e}')
+            final_status = f'Error: {e}'
             if mode == 'test':
                 self._push_ui('test_result', {'text': '', 'note': f'Error: {e}'})
             elif mode == 'ob_test':
                 self._push_ob('ob_test_result', {'text': '', 'note': f'Error: {e}'})
         finally:
-            try:
-                self._busy_lock.release()
-            except RuntimeError:
-                pass
+            self._finish_cycle(cycle, final_state, final_status)
 
     def _log_history(self, text, mode, duration):
         """Record a transcription to the local DB, honoring the save toggle.

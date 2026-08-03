@@ -14,6 +14,28 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+### Fixed
+- **Dictation could freeze permanently on the ⏳ icon.** Stopping a recording
+  occasionally deadlocked deep inside macOS's audio system, which killed the
+  hotkey and left freeflo stuck until you quit and relaunched it — with nothing
+  in the logs to show why. The microphone now stays open between dictations and
+  is only ever handled on its own dedicated thread, so stopping a recording can
+  no longer stall the hotkey or the menu bar. The same freeze could also be
+  triggered by the mic test in the window or during onboarding.
+- A dictation that gets stuck for any other reason now recovers on its own
+  instead of leaving the icon spinning forever, and if the audio system does
+  become unresponsive freeflo says so and offers a restart rather than silently
+  ignoring the hotkey.
+- Non-English dictation no longer fails with an encoding error — transcripts in
+  Hindi and other non-Latin scripts were being discarded entirely.
+- Long dictations are no longer cut off by a fixed 30-second transcription limit;
+  the limit now scales with how long you spoke.
+- The microphone indicator is released ~30 seconds after your last dictation, and
+  immediately when you disable dictation or quit.
+- When your Google sign-in expires, freeflo now tells you once and offers a
+  Reconnect option, instead of silently retrying every two minutes forever.
+  Failed syncs also back off gradually rather than retrying at a fixed interval.
+
 ## [1.4.1] - 2026-08-02
 
 ### Added

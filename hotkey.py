@@ -1,3 +1,4 @@
+import logging
 import threading
 
 import Quartz
@@ -8,6 +9,8 @@ from CoreFoundation import (
     CFRunLoopStop,
     kCFRunLoopCommonModes,
 )
+
+log = logging.getLogger('freeflo.hotkey')
 
 
 class HotkeyListener:
@@ -130,10 +133,18 @@ class HotkeyListener:
     # ------------------------------------------------------------------
 
     def _safe(self, fn):
+        """Run a hotkey callback without ever letting it escape into the tap.
+
+        Callbacks MUST NOT block: this runs on the tap's runloop thread, and a
+        callback that doesn't return promptly stops the hotkey dead (macOS also
+        disables a tap that stops responding). Keep blocking work — anything
+        touching CoreAudio especially — off this thread."""
         try:
             fn()
         except Exception:
-            pass
+            # Never silently: a swallowed exception here used to be invisible.
+            log.exception('Hotkey callback %s failed',
+                          getattr(fn, '__name__', fn))
 
     def _callback(self, proxy, etype, event, refcon):
         # Must always return the event (we swallow nothing) and never raise.
