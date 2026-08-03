@@ -14,6 +14,16 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+### Fixed
+- The macOS microphone indicator now clears about a second after you stop
+  speaking, instead of lingering for ~30 seconds. v1.4.2 kept the mic stream
+  open across dictations to reduce a native-audio wedge from happening again,
+  but macOS shows the orange dot for as long as the stream is open — which
+  read as "freeflo is still listening", even though nothing was being
+  recorded. The window is now short enough that the dot is gone before you
+  notice, while still covering a quick rapid-fire correction where you speak,
+  release, and immediately press again.
+
 ## [1.4.2] - 2026-08-03
 
 ### Fixed
