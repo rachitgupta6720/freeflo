@@ -19,6 +19,7 @@ import config
 import keyring
 import keyring.errors
 import requests
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -49,6 +50,17 @@ _AUTH_URI = 'https://accounts.google.com/o/oauth2/auth'
 _TOKEN_URI = 'https://oauth2.googleapis.com/token'
 _USERINFO_URI = 'https://www.googleapis.com/oauth2/v3/userinfo'
 
+# OAuth error codes that no amount of retrying can fix — the stored refresh
+# token (or the client itself) is dead and only a fresh sign-in will help.
+# Everything else, notably network errors and 5xx, is transient and must stay
+# retryable: misclassifying one of those would silently stop backing up.
+_TERMINAL_AUTH_ERRORS = frozenset({
+    'invalid_grant',        # refresh token expired or revoked by the user
+    'invalid_client',       # client credentials no longer valid
+    'unauthorized_client',
+    'invalid_request',      # malformed token request (e.g. no client id baked in)
+})
+
 
 class NotConfigured(Exception):
     """Raised when this build has no Google OAuth client baked in."""
@@ -68,6 +80,22 @@ def is_configured():
 
 def is_connected():
     return keyring.get_password(_KEYRING_SERVICE, _KEYRING_ACCOUNT) is not None
+
+
+def is_auth_expired(exc):
+    """True if `exc` means the stored credentials are dead and only a fresh
+    sign-in can fix it. Callers use this to stop retrying — so it must stay
+    strict: a transient failure classified as terminal would quietly disable
+    backup until the user noticed."""
+    if not isinstance(exc, RefreshError):
+        return False
+    # google-auth raises RefreshError(message, error_dict); prefer the structured
+    # code over the message, which is not a stable contract.
+    for arg in getattr(exc, 'args', ()):
+        if isinstance(arg, dict) and 'error' in arg:
+            return arg['error'] in _TERMINAL_AUTH_ERRORS
+    text = str(exc)
+    return any(code in text for code in _TERMINAL_AUTH_ERRORS)
 
 
 def connect():
