@@ -120,6 +120,7 @@ OPTIONS = {
         # in `packages`). Listing the leaf modules lets modulegraph follow their
         # imports without py2app choking on the bare `google` namespace.
         'google.auth.transport.requests',
+        'google.auth.exceptions',   # RefreshError — engine.gauth.is_auth_expired
         'google.oauth2.credentials',
         # cffi C extension
         '_cffi_backend',
