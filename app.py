@@ -35,9 +35,16 @@ _ACCESS_ITEM_TITLE = '⚠️  Grant Accessibility Permission'
 _RECONNECT_ITEM_TITLE = '⚠️  Reconnect Google Backup…'
 
 # How long the mic stream stays open after a dictation. Holding it open avoids a
-# PortAudio teardown per dictation (see engine/recorder), but macOS shows the
-# orange mic indicator for as long as it is open, so keep the window short.
-_MIC_IDLE_CLOSE_SEC = 30.0
+# PortAudio teardown per dictation (see engine/recorder) AND avoids the ~100 ms
+# start latency of opening a fresh stream — that latency clips the first
+# syllable when the user speaks immediately after pressing the hotkey. But
+# macOS shows the orange mic indicator for as long as the stream is open, so
+# this window is a trust-vs-latency tradeoff and has to be short. 1 s is long
+# enough to catch a quick rapid-fire correction (press → speak → release →
+# press again) reusing the same stream, and short enough that the indicator is
+# gone before the user even notices — anything longer reads as "freeflo is
+# still listening after I stopped" and undermines the whole premise.
+_MIC_IDLE_CLOSE_SEC = 1.0
 
 # Grace added on top of the whisper timeout before the stall watchdog decides a
 # 'processing' cycle is never coming back. Covers Turbo refine (8 s) + paste.
