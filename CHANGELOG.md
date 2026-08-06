@@ -14,6 +14,10 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-08-06
+
+## [1.4.3] - 2026-08-06
+
 ### Fixed
 - The macOS microphone indicator now clears about a second after you stop
   speaking, instead of lingering for ~30 seconds. v1.4.2 kept the mic stream
