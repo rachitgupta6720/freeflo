@@ -3,9 +3,14 @@ import sys
 import re
 import json
 import plistlib
+import threading
 
 _APP_SUPPORT = os.path.expanduser('~/Library/Application Support')
-_CONFIG_DIR = os.path.join(_APP_SUPPORT, 'freeflo')
+# FREEFLO_DATA_DIR points the app at a different data folder (settings,
+# history, vocabulary). For development and automated smoke tests, so they
+# never read or write the real one.
+_CONFIG_DIR = (os.environ.get('FREEFLO_DATA_DIR')
+               or os.path.join(_APP_SUPPORT, 'freeflo'))
 _CONFIG_FILE = os.path.join(_CONFIG_DIR, 'config.json')
 # Settings used to live here under the app's old name — migrate on first run.
 _LEGACY_CONFIG_FILE = os.path.join(_APP_SUPPORT, 'WhisperDictate', 'config.json')
@@ -25,7 +30,21 @@ _STYLE_MIGRATION = {
 
 _DEFAULTS = {
     'enabled': True,
-    'language': 'en',      # ISO 639-1 code, or 'auto' for auto-detect
+    # Dictation locale as a BCP-47 tag ('en-IN'). 'auto' means "not chosen
+    # yet": it is resolved to the best locale for this Mac the first time the
+    # speech helper reports what it supports (see engine/locales.resolve),
+    # which is also how the old Whisper-era values ('en', 'hi', 'auto', ...)
+    # are migrated.
+    'language': 'auto',
+    # The languages dictation listens for, primary first (at most two are
+    # used at once, e.g. ['en-IN', 'hi-IN']). 'language' always mirrors the
+    # first entry. None means "never chosen": the app then starts from
+    # 'language' and, for an English speaker in India whose Mac has the
+    # India model, adds Hindi by itself (see engine/locales.default_languages).
+    'languages': None,
+    # --- recording pill + feedback ---
+    'sound_enabled': False,      # start / stop audio cues
+    'live_text': False,          # show the running transcript in the pill
     'ptt_key': 'left_option',    # push-to-talk (hold) key
     'toggle_key': 'right_option',  # toggle (tap on/off) key
     'save_history': True,        # log transcriptions to the local history DB
@@ -45,8 +64,14 @@ _DEFAULTS = {
     'profile_role': None,        # what they work in
     'profile_goal': None,        # what they want to achieve with freeflo
     # --- appearance (Phase 4 uses these; stored here so onboarding can set them) ---
+    # 'appearance' is 'system' | 'light' | 'dark'; 'glass' puts the system
+    # glass material behind the windows and the recording pill. 'theme' is
+    # the older single value ('glass' meant glass on, following the system)
+    # and is still written for older builds; ui.window.style_from_settings
+    # reads all three.
+    'appearance': None,
     'theme': 'system',           # 'system' | 'light' | 'dark' | 'glass'
-    'glass': False,              # glassmorphism vibrancy on top of the base theme
+    'glass': False,
 
     # --- Turbo mode (local LLM formatting) ---
     'turbo_enabled': False,        # master on/off
@@ -75,6 +100,8 @@ def resolve_key(name):
 
 def _migrate_legacy():
     """Copy settings from the old WhisperDictate dir if we have none yet."""
+    if os.environ.get('FREEFLO_DATA_DIR'):
+        return   # an explicit data dir starts clean
     if os.path.exists(_CONFIG_FILE) or not os.path.exists(_LEGACY_CONFIG_FILE):
         return
     try:
@@ -96,20 +123,43 @@ def _resources_dir():
     return None
 
 
-def get_whisper_cli():
+def _source_dir():
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def get_helper_path():
+    """Path to ``freeflo-helper``, the native binary that owns the microphone
+    and the on-device transcriber. Bundled in Resources when packaged; from
+    source it is whatever ``scripts/build_helper.sh`` produced (override with
+    the FREEFLO_HELPER environment variable)."""
     r = _resources_dir()
     if r:
-        return os.path.join(r, 'whisper-cli')
-    return os.path.expanduser('~/whisper.cpp/build-static/bin/whisper-cli')
+        return os.path.join(r, 'freeflo-helper')
+    return (os.environ.get('FREEFLO_HELPER')
+            or os.path.join(_source_dir(), 'build', 'freeflo-helper'))
 
 
 def get_llama_server():
-    """Path to the llama.cpp server binary. Bundled in Resources when packaged,
-    else built locally at ~/llama.cpp."""
+    """Path to the llama.cpp server binary (Turbo mode). Bundled in Resources
+    when packaged; from source: $FREEFLO_LLAMA_SERVER, then ./vendor, then a
+    local static build at ~/llama.cpp."""
     r = _resources_dir()
     if r:
         return os.path.join(r, 'llama-server')
-    return os.path.expanduser('~/llama.cpp/build-static/bin/llama-server')
+    candidates = [
+        os.environ.get('FREEFLO_LLAMA_SERVER') or '',
+        os.path.join(_source_dir(), 'vendor', 'llama-server'),
+        os.path.expanduser('~/llama.cpp/build-static/bin/llama-server'),
+    ]
+    for path in candidates:
+        if path and os.path.exists(path):
+            return path
+    return candidates[-1]
+
+
+def get_vocabulary_path():
+    """Custom words + replacements (engine/vocabulary.py)."""
+    return os.path.join(_CONFIG_DIR, 'vocabulary.json')
 
 
 def get_models_dir():
@@ -218,19 +268,6 @@ def get_version():
     return '0.0.0'
 
 
-def get_model_path(language='en'):
-    """Return the appropriate model path for the given language.
-    English uses the fast .en base model (high accuracy, low latency).
-    Every other language uses the multilingual `small` model — `base` is too
-    weak for non-Latin scripts like Hindi (it romanises / mixes scripts),
-    while `small` produces clean Devanagari."""
-    model_file = 'ggml-base.en.bin' if language == 'en' else 'ggml-small.bin'
-    r = _resources_dir()
-    if r:
-        return os.path.join(r, model_file)
-    return os.path.expanduser(f'~/whisper.cpp/models/{model_file}')
-
-
 def load():
     os.makedirs(_CONFIG_DIR, exist_ok=True)
     _migrate_legacy()
@@ -259,12 +296,26 @@ def _normalize_turbo(data):
     return data
 
 
+# Settings are saved from several threads (main, speech callbacks, workers).
+# One writer at a time, each through its own temporary file: two saves used to
+# share one '.tmp' name, and the second os.replace() then found it gone.
+_save_lock = threading.Lock()
+
+
 def save(data):
-    os.makedirs(_CONFIG_DIR, exist_ok=True)
-    tmp = _CONFIG_FILE + '.tmp'
-    with open(tmp, 'w') as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, _CONFIG_FILE)
+    with _save_lock:
+        os.makedirs(_CONFIG_DIR, exist_ok=True)
+        tmp = '%s.%d.%d.tmp' % (_CONFIG_FILE, os.getpid(), threading.get_ident())
+        try:
+            with open(tmp, 'w') as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, _CONFIG_FILE)
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
 
 
 def migrate_turbo_v2():

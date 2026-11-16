@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for freeflo-helper when it is signed with a
+  Developer ID (scripts/build_helper.sh with CODESIGN_IDENTITY set, or the
+  release script re-signing the copy inside freeflo.app). The helper is plain
+  native code, so unlike the Python bundle it needs nothing but the microphone.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>

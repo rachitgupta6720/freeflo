@@ -1,4 +1,4 @@
-"""Turbo mode: a local llama-server that polishes whisper transcripts.
+"""Turbo mode: a local llama-server that polishes dictation transcripts.
 
 Lifecycle: start(tier) when Turbo is enabled -> server holds the model in RAM ->
 refine(text, style) per dictation -> stop() when Turbo is disabled or the app quits.

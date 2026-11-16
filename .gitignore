@@ -10,13 +10,18 @@ __pycache__/
 venv/
 env/
 
-# py2app / build output
+# Build output: py2app's scratch + bundle, and the compiled speech helper
+# (build/freeflo-helper, from scripts/build_helper.sh)
 build/
 dist/
 
-# Bundled whisper.cpp binary & GGML models (users provide their own — see README)
-whisper-cli
+# Third-party binaries dropped in for a local build (e.g. vendor/llama-server
+# for Turbo mode — see README "Building")
+vendor/
+
+# Model files are never committed (Turbo's .gguf is downloaded on demand)
 *.bin
+*.gguf
 
 # Google OAuth client baked into the build (holds the client secret) — never commit
 google_client.json

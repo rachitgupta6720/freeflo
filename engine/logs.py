@@ -3,7 +3,7 @@
 Writes rotating logs to ``~/Library/Logs/freeflo/`` and installs excepthooks
 (uncaught exceptions on the main thread and on worker threads) plus
 ``faulthandler`` for native crashes — the segfault class of failure that comes
-from PyObjC / whisper.cpp and that used to vanish without a trace.
+from PyObjC and that used to vanish without a trace.
 
 Zero privacy cost: everything stays on disk. Phase-2 telemetry can subscribe to
 uncaught exceptions via :func:`add_exception_listener` without this module ever
@@ -20,7 +20,13 @@ import faulthandler
 
 import config
 
-_LOG_DIR = os.path.expanduser('~/Library/Logs/freeflo')
+# FREEFLO_LOG_DIR moves the logs; a run with its own FREEFLO_DATA_DIR (tests,
+# development builds) logs next to that data, so it never writes into the
+# log of the freeflo the user is running.
+_LOG_DIR = (os.environ.get('FREEFLO_LOG_DIR')
+            or (os.path.join(os.environ['FREEFLO_DATA_DIR'], 'logs')
+                if os.environ.get('FREEFLO_DATA_DIR') else None)
+            or os.path.expanduser('~/Library/Logs/freeflo'))
 _LOG_FILE = os.path.join(_LOG_DIR, 'freeflo.log')
 _FAULT_FILE = os.path.join(_LOG_DIR, 'faults.log')
 
@@ -122,10 +128,11 @@ def _os_string():
         return sys.platform
 
 
-def diagnostics(tail_lines=60):
+def diagnostics(tail_lines=60, extra=None):
     """A copy-pasteable diagnostics blob for bug reports: environment summary
-    plus the tail of the log. No transcription text is ever stored in the log,
-    so this is safe to share."""
+    (plus any ``extra`` lines the app adds about the speech engine) and the
+    tail of the log. No transcription text is ever stored in the log, so this
+    is safe to share."""
     lines = [
         'freeflo diagnostics',
         '-------------------',
@@ -133,12 +140,12 @@ def diagnostics(tail_lines=60):
         f'os      : {_os_string()}',
         f'python  : {platform.python_version()}',
         f'frozen  : {bool(getattr(sys, "frozen", False))}',
-        f'whisper : {"found" if os.path.exists(config.get_whisper_cli()) else "MISSING"}',
-        '',
-        f'--- last {tail_lines} log lines ---',
+        f'helper  : {"found" if os.path.exists(config.get_helper_path()) else "MISSING"}',
     ]
+    lines.extend(str(line) for line in (extra or ()))
+    lines.extend(['', f'--- last {tail_lines} log lines ---'])
     try:
-        with open(_LOG_FILE) as f:
+        with open(_LOG_FILE, encoding='utf-8', errors='replace') as f:
             tail = f.readlines()[-tail_lines:]
         lines.extend(line.rstrip() for line in tail)
     except Exception:

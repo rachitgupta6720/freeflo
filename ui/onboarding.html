@@ -1,353 +1,465 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system" data-mode="light" data-glass="off">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>freeflo · welcome</title>
+<title>Set up freeflo</title>
+<script>
+  // First paint: light or dark, solid or glass (same rules as index.html).
+  (function(){
+    var w = window.__freefloWindow || {}, r = document.documentElement;
+    var a = (w.appearance === 'light' || w.appearance === 'dark') ? w.appearance : 'system';
+    var opaque = matchMedia('(prefers-reduced-transparency: reduce)').matches || matchMedia('(prefers-contrast: more)').matches;
+    r.dataset.theme = a;
+    r.dataset.mode = a !== 'system' ? a : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    r.dataset.glass = (w.glass && !opaque) ? 'on' : 'off';
+  })();
+</script>
 <style>
-  :root {
-    --bg:#08080a; --bg-2:#0c0c0f; --surface:#121216; --surface-2:#17171c; --surface-3:#1e1e24;
-    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12); --line-3:rgba(255,255,255,.20);
-    --text:#f5f5f6; --muted:#a0a0a8; --faint:#6b6b74; --ink:#0a0a0c;
-    --hi:#ffffff; --glow:rgba(255,255,255,.18); --live:#dfe7e6;
-    --r-md:12px; --r-sm:9px;
-    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
-    --sans:-apple-system,"SF Pro Display",system-ui,sans-serif;
-    --ease:cubic-bezier(.28,.11,.32,1);
+  /* tokens:start */
+  :root{
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --titlebar-h:32px; --traffic-w:78px;
+    --accent:#007aff; --accent-fill:#0071e3;
+    --green:#34c759; --red:#ff3b30; --orange:#ff9500;
+    --ok-text:#1f7a37; --err-text:#c5221a; --warn-text:#9a5b00;
+    --bg:#f5f5f7; --side:#eaeaec; --card:#fff; --card-border:rgba(0,0,0,.07);
+    --card-shadow:0 1px 2px rgba(0,0,0,.04);
+    --text:#1d1d1f; --text-2:#62626a; --text-3:#6e6e73;
+    --sep:rgba(60,60,67,.14);
+    --fill:rgba(120,120,128,.12); --fill-2:rgba(120,120,128,.20);
+    --btn:#fff; --btn-border:rgba(0,0,0,.13); --btn-shadow:0 .5px 1.5px rgba(0,0,0,.10);
+    --field:#fff; --field-border:rgba(0,0,0,.14);
+    --seg-on:#fff; --seg-shadow:0 1px 2.5px rgba(0,0,0,.16);
+    --switch-off:rgba(120,120,128,.30);
+    --top:rgba(245,245,247,.82);
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14' fill='none' stroke='%2362626a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5.2 5 2.2l3 3M2 8.8l3 3 3-3'/%3E%3C/svg%3E");
+    color-scheme:light;
+  }
+  :root[data-mode="dark"]{
+    --green:#30d158; --red:#ff453a; --orange:#ff9f0a;
+    --ok-text:#4cd964; --err-text:#ff6b63; --warn-text:#ffb340;
+    --bg:#1c1c1e; --side:#242426; --card:#2a2a2d; --card-border:rgba(255,255,255,.07);
+    --card-shadow:none;
+    --text:#f5f5f7; --text-2:#a4a4ab; --text-3:#98989f;
+    --sep:rgba(120,120,128,.30);
+    --fill:rgba(120,120,128,.24); --fill-2:rgba(120,120,128,.36);
+    --btn:rgba(255,255,255,.13); --btn-border:rgba(255,255,255,.06); --btn-shadow:inset 0 .5px 0 rgba(255,255,255,.16);
+    --field:rgba(255,255,255,.07); --field-border:rgba(255,255,255,.12);
+    --seg-on:rgba(255,255,255,.24); --seg-shadow:0 1px 2px rgba(0,0,0,.3);
+    --switch-off:rgba(120,120,128,.42);
+    --top:rgba(28,28,30,.82);
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14' fill='none' stroke='%23a4a4ab' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5.2 5 2.2l3 3M2 8.8l3 3 3-3'/%3E%3C/svg%3E");
     color-scheme:dark;
   }
-  *{ box-sizing:border-box; } html,body{ height:100%; margin:0; }
-  body{ font:14px/1.5 var(--sans); color:var(--text); background:var(--bg);
-    -webkit-user-select:none; user-select:none; overflow:hidden; -webkit-font-smoothing:antialiased; }
+  /* Glass: a real system material sits behind the page (ui/window.py).
+     These veils keep text readable whatever is behind the window. */
+  :root[data-glass="on"]{
+    --bg:rgba(246,246,248,.50); --side:rgba(246,246,248,.38);
+    --card:rgba(255,255,255,.56); --card-border:rgba(255,255,255,.62);
+    --card-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 6px 20px rgba(0,0,0,.07);
+    --text-2:#3c3c43; --text-3:#55555a;
+    --sep:rgba(60,60,67,.16);
+    --fill:rgba(120,120,128,.16); --fill-2:rgba(120,120,128,.26);
+    --btn:rgba(255,255,255,.72); --field:rgba(255,255,255,.66);
+    --top:transparent;
+  }
+  :root[data-glass="on"][data-mode="dark"]{
+    --bg:rgba(22,22,24,.48); --side:rgba(22,22,24,.38);
+    --card:rgba(66,66,72,.44); --card-border:rgba(255,255,255,.13);
+    --card-shadow:0 1px 0 rgba(255,255,255,.10) inset, 0 8px 24px rgba(0,0,0,.20);
+    --text-2:#d6d6dc; --text-3:#b4b4bb;
+    --sep:rgba(255,255,255,.13);
+    --fill:rgba(255,255,255,.12); --fill-2:rgba(255,255,255,.20);
+    --btn:rgba(255,255,255,.16); --field:rgba(255,255,255,.10);
+    --top:transparent;
+  }
+  /* tokens:end */
 
-  .field{ position:fixed; inset:0; z-index:0; overflow:hidden;
-    background:
-      radial-gradient(900px 600px at 78% -10%, rgba(255,255,255,.05), transparent 60%),
-      radial-gradient(700px 500px at 12% 110%, rgba(255,255,255,.035), transparent 55%), var(--bg); }
-  .field::before{ content:""; position:absolute; inset:-1px;
-    background-image:linear-gradient(to right,var(--line) 1px,transparent 1px),linear-gradient(to bottom,var(--line) 1px,transparent 1px);
-    background-size:46px 46px;
-    -webkit-mask-image:radial-gradient(1000px 700px at 50% 30%,#000 30%,transparent 78%);
-            mask-image:radial-gradient(1000px 700px at 50% 30%,#000 30%,transparent 78%); opacity:.5; }
-  .field::after{ content:""; position:absolute; left:0; right:0; height:180px; top:-180px;
-    background:linear-gradient(to bottom,transparent,rgba(255,255,255,.045),transparent);
-    animation:scan 9s linear infinite; }
-  @keyframes scan{ to{ transform:translateY(160vh); } }
+  /* ---------- base ---------- */
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; background:transparent; }
+  body{ font:13px/1.4 var(--font); color:var(--text);
+    -webkit-font-smoothing:antialiased; -webkit-user-select:none; user-select:none; cursor:default; overflow:hidden; }
+  button{ font:inherit; color:inherit; margin:0; }
+  [hidden]{ display:none !important; }
+  .sel{ -webkit-user-select:text; user-select:text; cursor:text; }
+  :focus{ outline:none; }
+  :focus-visible{ outline:3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset:1px; }
+  svg{ display:block; }
 
-  .shell{ position:relative; z-index:1; height:100%; max-width:900px; margin:0 auto;
-    display:flex; flex-direction:column; padding:24px 32px 20px; }
+  /* A scrolling column and, under it, a bottom bar. The bar is not drawn
+     over the column, so nothing ever shows through it (glass included). */
+  .page{ height:100%; display:flex; flex-direction:column; background:var(--bg); }
+  .scroll{ flex:1; min-height:0; overflow-y:auto; }
+  .ob{ max-width:480px; margin:0 auto; padding:calc(var(--titlebar-h) + 16px) 24px 16px; }
+  h1{ font-size:22px; line-height:1.2; font-weight:700; margin:0 0 6px; }
+  .sub{ font-size:13px; color:var(--text-2); margin:0 0 16px; }
 
-  /* header */
-  .top{ display:flex; align-items:center; gap:14px; }
-  .nav-logo{ font-size:20px; font-weight:600; letter-spacing:-.02em; line-height:1; }
-  .nav-logo span{ background:linear-gradient(180deg,#fff,#a0a0a0);
-    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-  .step-tag{ margin-left:auto; font:11px/1 var(--mono); letter-spacing:1.5px; color:var(--faint);
-    text-transform:uppercase; display:flex; align-items:center; gap:8px; }
-  .step-tag .n{ color:var(--text); }
+  .card{ background:var(--card); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--card-shadow); overflow:hidden; }
+  .card + .card{ margin-top:10px; }
+  .row{ position:relative; display:flex; align-items:center; gap:12px; min-height:44px; padding:12px 16px; }
+  /* Only between two rows that are both on screen (a hidden first row
+     must not leave its separator along the card's top edge). */
+  .row:not([hidden]) ~ .row::before{ content:""; position:absolute; top:0; left:16px; right:0; height:1px;
+    background:var(--sep); transform:scaleY(.5); transform-origin:top; }
+  .row-label{ flex:1; min-width:0; }
+  .row-title{ font-weight:600; }
+  .row-detail, .row-desc{ font-size:12px; line-height:1.4; color:var(--text-2); margin-top:2px; }
+  /* A checklist row: mark, what it is, one button; what to do next runs
+     underneath at full width so a long sentence is never squeezed. */
+  .perm{ display:grid; grid-template-columns:22px minmax(0,1fr) auto; column-gap:12px; row-gap:0; align-items:center; }
+  .perm .row-label{ grid-column:2; }
+  .perm .row-btn{ grid-column:3; grid-row:1; }
+  .row-hint{ grid-column:2 / -1; font-size:12px; line-height:1.4; color:var(--warn-text); margin-top:6px; }
+  .perm[data-state="waiting"] .row-hint{ color:var(--text); }
+  .perm[data-locked="1"] .row-hint{ color:var(--text-2); }      /* "next", not a warning */
+  /* Once the button has been pressed the row says what to do, not why. */
+  .perm[data-state="waiting"] .row-detail, .perm[data-state="denied"] .row-detail{ display:none; }
 
-  .rail{ display:flex; gap:6px; margin:18px 0 4px; }
-  .rail i{ flex:1; height:3px; border-radius:3px; background:var(--surface-3); position:relative; overflow:hidden; }
-  .rail i.done{ background:var(--line-3); }
-  .rail i.active::after{ content:""; position:absolute; inset:0; background:var(--hi); box-shadow:0 0 12px 1px var(--glow);
-    animation:fill 1.1s cubic-bezier(.4,0,.1,1) forwards; transform-origin:left; }
-  @keyframes fill{ from{transform:scaleX(0)} to{transform:scaleX(1)} }
+  .btn{ flex:none; height:28px; padding:0 12px; border-radius:7px; border:1px solid var(--btn-border);
+    background:var(--btn); box-shadow:var(--btn-shadow); font-weight:500; white-space:nowrap; }
+  .btn:hover{ filter:brightness(.97); } .btn:active{ filter:brightness(.92); }
+  :root[data-mode="dark"] .btn:hover{ filter:brightness(1.15); }
+  .btn.primary{ background:var(--accent-fill); color:#fff; border-color:transparent; box-shadow:none; }
+  .btn:disabled, .switch:disabled{ opacity:.45; pointer-events:none; }
+  .btn.big{ height:32px; padding:0 18px; border-radius:8px; }
 
-  .stage{ flex:1; position:relative; margin-top:20px; }
-  .screen{ position:absolute; inset:0; display:none; opacity:0; transform:translateY(10px); overflow:auto; }
-  .screen.on{ display:flex; flex-direction:column; animation:rise .5s var(--ease) forwards; }
-  @keyframes rise{ to{ opacity:1; transform:none; } }
+  .switch{ flex:none; position:relative; width:38px; height:22px; padding:0; border:0; border-radius:11px;
+    background:var(--switch-off); transition:background .18s; }
+  .switch::after{ content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.04); transition:transform .18s; }
+  .switch[aria-checked="true"]{ background:var(--accent); }
+  .switch[aria-checked="true"]::after{ transform:translateX(16px); }
+  .key{ display:inline-block; padding:1px 8px; border-radius:5px; background:var(--fill); border:1px solid var(--sep);
+    font-size:12px; font-weight:600; line-height:16px; white-space:nowrap; vertical-align:1px; }
 
-  .eyebrow{ font:11px/1 var(--mono); letter-spacing:2px; text-transform:uppercase; color:var(--faint);
-    margin-bottom:16px; display:flex; align-items:center; gap:10px; }
-  .eyebrow::before{ content:""; width:18px; height:1px; background:var(--line-3); }
-  h1{ font-size:28px; line-height:1.12; font-weight:660; margin:0 0 12px; letter-spacing:-.5px; max-width:22ch; }
-  h1 .dim{ color:var(--faint); }
-  .lede{ color:var(--muted); font-size:15px; max-width:56ch; margin:0 0 24px; }
-
-  .card{ position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:16px 18px; }
-  .hud::before,.hud::after{ content:""; position:absolute; width:9px; height:9px; pointer-events:none;
-    border-color:var(--line-3); border-style:solid; }
-  .hud::before{ top:-1px; left:-1px; border-width:1px 0 0 1px; }
-  .hud::after{ bottom:-1px; right:-1px; border-width:0 1px 1px 0; }
-
-  /* screen 1 */
-  .hero{ display:grid; grid-template-columns:1.1fr .9fr; gap:40px; align-items:center; flex:1; }
-  .orb-wrap{ display:grid; place-items:center; }
-  .orb{ position:relative; width:180px; height:180px; display:grid; place-items:center; }
-  .orb .ring{ position:absolute; inset:0; border-radius:50%; border:1px solid var(--line-2); }
-  .orb .ring.r2{ inset:-22px; border-color:var(--line); animation:spin 22s linear infinite; border-style:dashed; }
-  .orb .ring.r3{ inset:-44px; border-color:rgba(255,255,255,.05); }
+  /* status mark of a checklist row */
+  .status{ grid-column:1; grid-row:1; position:relative; width:22px; height:22px; border-radius:50%; align-self:start; margin-top:1px; }
+  .perm[data-state="needed"] .status, .perm[data-state="checking"] .status{ border:1.5px solid var(--text-3); }
+  .perm[data-state="waiting"] .status{ border:2px solid var(--fill-2); border-top-color:var(--accent); animation:spin .9s linear infinite; }
+  /* A state this page does not know: a still mark, never a spinner (a
+     spinner would promise that something is under way). */
+  .perm[data-state="paused"] .status{ border:2px solid var(--orange); }
+  .perm[data-state="denied"] .status, .perm[data-state="blocked"] .status{ background:var(--orange); }
+  .perm[data-state="denied"] .status::after, .perm[data-state="blocked"] .status::after{ content:"!"; position:absolute; inset:0;
+    display:grid; place-items:center; color:#fff; font-weight:700; font-size:14px; line-height:22px; }
+  .perm[data-state="granted"] .status{ background:var(--green); animation:pop .2s ease-out; }
+  .perm[data-state="granted"] .status::after{ content:""; position:absolute; left:7.5px; top:4.5px; width:5px; height:9px;
+    border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
   @keyframes spin{ to{ transform:rotate(360deg); } }
-  .orb .core{ width:116px; height:116px; border-radius:50%; display:grid; place-items:center;
-    background:radial-gradient(circle at 50% 38%,#26262d,#0b0b0e 70%); border:1px solid var(--line-2);
-    box-shadow:0 0 60px 0 rgba(255,255,255,.06), inset 0 2px 20px rgba(0,0,0,.6); }
-  .wave{ display:flex; align-items:center; gap:4px; height:44px; }
-  .wave span{ width:4px; border-radius:3px; background:var(--hi); box-shadow:0 0 8px var(--glow); opacity:.85; animation:eq 1.1s ease-in-out infinite; }
-  .wave span:nth-child(1){animation-delay:0s}.wave span:nth-child(2){animation-delay:.15s}.wave span:nth-child(3){animation-delay:.3s}
-  .wave span:nth-child(4){animation-delay:.1s}.wave span:nth-child(5){animation-delay:.42s}
-  @keyframes eq{ 0%,100%{ height:8px; opacity:.5;} 50%{ height:40px; opacity:1;} }
-  .stat-row{ display:flex; gap:10px; margin-top:22px; }
-  .stat{ flex:1; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--bg-2); padding:12px 14px; }
-  .stat .k{ font:11px/1 var(--mono); color:var(--faint); letter-spacing:1px; text-transform:uppercase; }
-  .stat .v{ font-size:15px; font-weight:600; margin-top:6px; }
+  @keyframes pop{ from{ transform:scale(.4); } to{ transform:scale(1); } }
 
-  /* screen 2 */
-  .stack{ display:flex; flex-direction:column; gap:12px; margin-top:24px; }
-  .row{ display:flex; align-items:center; gap:16px; padding:15px 18px; }
-  .row .ico{ width:40px; height:40px; flex:none; border-radius:10px; border:1px solid var(--line-2);
-    background:var(--surface-2); display:grid; place-items:center; color:var(--muted); }
-  .row .ico svg{ width:20px; height:20px; }
-  .row .txt{ flex:1; min-width:0; }
-  .row .txt h3{ margin:0 0 3px; font-size:14.5px; font-weight:620; }
-  .row .txt p{ margin:0; color:var(--muted); font-size:12.8px; }
-  .row .txt .req{ font:10px/1 var(--mono); color:var(--faint); letter-spacing:1px; margin-top:3px; display:block; }
-  .pill{ font:11px/1 var(--mono); letter-spacing:.6px; text-transform:uppercase; padding:6px 11px; border-radius:999px;
-    border:1px solid var(--line-2); color:var(--muted); background:var(--bg-2); white-space:nowrap; }
-  .pill.ok{ color:var(--ink); background:var(--hi); border-color:var(--hi); }
-  .btn-mini{ font:12px/1 var(--sans); font-weight:600; padding:9px 16px; border-radius:8px; border:1px solid var(--line-3);
-    background:var(--surface-3); color:var(--text); cursor:pointer; white-space:nowrap; transition:all .15s; }
-  .btn-mini:hover{ border-color:var(--hi); } .btn-mini:active{ transform:translateY(1px); }
-  .btn-mini[disabled]{ opacity:.5; cursor:default; }
-  .note{ font-size:12px; color:var(--faint); margin-top:14px; display:flex; gap:7px; align-items:center; }
-  .note code{ font-family:var(--mono); color:var(--muted); background:var(--bg-2); padding:1px 6px; border-radius:5px; border:1px solid var(--line); }
+  #tryCard[data-off="1"]{ opacity:.5; }
+  .try-out{ margin:0 16px 14px; padding:12px 16px; border-radius:9px; background:var(--fill); line-height:1.45; }
+  .try-out .msg{ font-size:12px; color:var(--text-2); margin-top:4px; }
+  .try-out .msg:empty{ display:none; }
 
-  /* screen 3 */
-  .demo{ display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:center; flex:1; }
-  .keys{ display:flex; align-items:center; gap:10px; margin:8px 0 20px; }
-  kbd{ font:13px/1 var(--mono); color:var(--text); padding:10px 13px; border-radius:9px; min-width:44px; text-align:center;
-    background:linear-gradient(180deg,#26262d,#161619); border:1px solid var(--line-3);
-    box-shadow:0 2px 0 rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08); }
-  .keys .plus{ color:var(--faint); font-family:var(--mono); font-size:12px; }
-  .mic-demo{ border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface);
-    padding:22px; min-height:185px; display:flex; flex-direction:column; }
-  .mic-demo .head{ display:flex; align-items:center; gap:9px; font:11px/1 var(--mono);
-    letter-spacing:1px; text-transform:uppercase; color:var(--faint); }
-  .dot{ width:8px; height:8px; border-radius:50%; background:var(--faint); }
-  .dot.live{ background:var(--live); box-shadow:0 0 10px 2px rgba(223,231,230,.5); animation:breathe 1.4s infinite; }
-  @keyframes breathe{ 0%,100%{opacity:.55;transform:scale(.85)} 50%{opacity:1;transform:scale(1)} }
-  .transcript{ margin-top:auto; font-size:16px; line-height:1.55; min-height:52px; -webkit-user-select:text; user-select:text; }
-  .transcript.empty{ color:var(--faint); }
+  /* The first-run question: a quiet line, not a wall before dictating. */
+  .quiet{ margin-top:6px; }
+  .quiet .row{ min-height:0; padding:10px 16px; }
+  .quiet .row-label, .quiet .row-desc{ font-size:12px; line-height:1.4; }
+  .quiet .row-label > :first-child{ color:var(--text); }
 
-  /* consent */
-  .consent-row{ margin-top:20px; display:flex; flex-direction:column; gap:8px; }
-  .consent-row label{ display:flex; align-items:center; gap:9px; font-size:12px; color:var(--muted); cursor:pointer; }
-  .consent-row input[type=checkbox]{ width:14px; height:14px; accent-color:var(--hi); flex:none; }
+  /* Always on screen: a bottom bar across the window, with a hairline once
+     the column above is long enough to scroll under it. */
+  .foot{ flex:none; position:relative; }
+  .foot[data-edge="1"]::before{ content:""; position:absolute; top:0; left:0; right:0; height:1px;
+    background:var(--sep); transform:scaleY(.5); transform-origin:top; }
+  .foot-in{ max-width:480px; margin:0 auto; display:flex; align-items:center; gap:16px; padding:12px 24px 20px; }
+  .foot .hint{ flex:1; font-size:12px; line-height:1.4; color:var(--text-2); }
 
-  /* footer */
-  .foot{ display:flex; align-items:center; gap:14px; padding-top:18px; margin-top:14px; border-top:1px solid var(--line); }
-  .hint{ font:11px/1 var(--mono); color:var(--faint); letter-spacing:.5px; }
-  .spacer{ flex:1; }
-  .btn{ font:14px/1 var(--sans); font-weight:640; padding:11px 24px; border-radius:10px; cursor:pointer;
-    border:1px solid transparent; transition:all .16s; display:inline-flex; align-items:center; gap:8px; }
-  .btn.ghost{ background:transparent; color:var(--muted); border-color:var(--line-2); }
-  .btn.ghost:hover{ color:var(--text); border-color:var(--line-3); }
-  .btn.primary{ background:var(--hi); color:var(--ink); box-shadow:0 0 0 1px var(--hi), 0 8px 30px rgba(255,255,255,.12); }
-  .btn.primary:hover{ box-shadow:0 0 0 1px var(--hi), 0 8px 40px rgba(255,255,255,.24); }
-  .btn.primary:active{ transform:translateY(1px); }
-  .btn.link{ background:none; border:none; color:var(--faint); padding:11px 6px; }
-  .btn.link:hover{ color:var(--muted); }
-  .btn[disabled]{ opacity:.4; cursor:not-allowed; }
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{ animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
-<div class="field"></div>
-<div class="shell">
-  <div class="top">
-    <div class="nav-logo"><span>freeflo</span></div>
-    <div class="step-tag"><span class="n" id="stepNum">01</span> / 03 &nbsp;·&nbsp; <span id="stepName">Welcome</span></div>
-  </div>
-  <div class="rail" id="rail"><i></i><i></i><i></i></div>
+<div class="page">
+<div class="scroll" id="scroll">
+<main class="ob">
+  <h1 id="obTitle">Set up freeflo</h1>
+  <p class="sub" id="obSub">Two quick permissions. macOS asks once for each.</p>
 
-  <div class="stage">
-
-    <!-- 1 · WELCOME -->
-    <section class="screen on" data-name="Welcome">
-      <div class="eyebrow">Voice, on-device</div>
-      <div class="hero">
-        <div>
-          <h1>Talk to your machine. <span class="dim">The words appear.</span></h1>
-          <p class="lede">freeflo turns speech into text anywhere on your Mac — hold a key, speak, release.
-            Transcription runs entirely on-device. No cloud, no API keys, nothing leaves this machine.</p>
-          <div class="stat-row">
-            <div class="stat"><div class="k">Latency</div><div class="v">On-device</div></div>
-            <div class="stat"><div class="k">Engine</div><div class="v">whisper.cpp</div></div>
-            <div class="stat"><div class="k">Network</div><div class="v">Zero</div></div>
-          </div>
-        </div>
-        <div class="orb-wrap">
-          <div class="orb">
-            <div class="ring r3"></div><div class="ring r2"></div><div class="ring"></div>
-            <div class="core"><div class="wave"><span></span><span></span><span></span><span></span><span></span></div></div>
-          </div>
-        </div>
+  <div class="card" id="checklist">
+    <div class="row perm" id="rowMic" data-state="checking">
+      <div class="status" aria-hidden="true"></div>
+      <div class="row-label">
+        <div class="row-title">Microphone</div>
+        <div class="row-detail">So freeflo can hear you while you dictate. Your voice never leaves this Mac.</div>
       </div>
-    </section>
-
-    <!-- 2 · PERMISSIONS -->
-    <section class="screen" data-name="Access">
-      <div class="eyebrow">System access</div>
-      <h1>Two permissions to work.</h1>
-      <p class="lede">macOS gates the microphone and keyboard for your safety. Grant these once and freeflo can listen and type at your cursor.</p>
-      <div class="stack">
-        <div class="card hud row">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M6 11a6 6 0 0 0 12 0M12 18v3"/></svg></div>
-          <div class="txt">
-            <h3>Microphone</h3>
-            <p>Capture audio while you hold the key. Recording is temporary — deleted the instant it's transcribed.</p>
-          </div>
-          <div id="micControl"><button class="btn-mini" id="grantMic">Grant</button></div>
-        </div>
-        <div class="card hud row">
-          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h.01M11 9h.01M15 9h.01M7 13h10"/></svg></div>
-          <div class="txt">
-            <h3>Accessibility</h3>
-            <p>Detect your global hotkey and paste text into the app you're using.</p>
-            <span class="req">A RESTART MAY BE NEEDED AFTER GRANTING</span>
-          </div>
-          <div id="accControl"><button class="btn-mini" id="grantAcc">Grant</button></div>
-        </div>
+      <div class="row-hint" role="status" aria-live="polite" hidden></div>
+    </div>
+    <div class="row perm" id="rowAx" data-state="checking">
+      <div class="status" aria-hidden="true"></div>
+      <div class="row-label">
+        <div class="row-title">Accessibility</div>
+        <div class="row-detail">So freeflo can notice your dictation key and type the words for you.</div>
       </div>
-      <div class="note">Opens <code>System Settings → Privacy &amp; Security</code>. freeflo never reads your screen or other apps.</div>
-    </section>
-
-    <!-- 3 · TRY IT -->
-    <section class="screen" data-name="Try it">
-      <div class="eyebrow">First run</div>
-      <h1>Give it a go.</h1>
-      <p class="lede">Tap record and say a sentence. Release, and watch it transcribe — right here, nothing is pasted.</p>
-      <div class="demo">
-        <div>
-          <div class="keys"><kbd>Left ⌥</kbd><span class="plus">hold</span><kbd>speak</kbd><span class="plus">release</span></div>
-          <p class="lede" style="font-size:13px; margin-bottom:16px;">Prefer hands-free? Tap <b>Right ⌥</b> to start and stop. Change both keys anytime under Settings.</p>
-          <button class="btn-mini" id="testBtn">● Record a test</button>
-        </div>
-        <div class="mic-demo">
-          <div class="head"><span class="dot" id="micDot"></span><span id="micLabel">Idle</span></div>
-          <div class="transcript empty" id="transcript">Your transcription will appear here…</div>
-        </div>
-      </div>
-      <div class="consent-row">
-        <label><input type="checkbox" id="chkAnalytics" checked>Anonymous usage analytics — helps improve freeflo (no personal data)</label>
-        <label><input type="checkbox" id="chkCrash" checked>Crash reports — technical stack traces only, no content or audio</label>
-      </div>
-    </section>
+      <div class="row-hint" role="status" aria-live="polite" hidden></div>
+    </div>
   </div>
 
-  <div class="foot">
-    <span class="hint" id="footHint">↵ or click Get started</span>
-    <div class="spacer"></div>
-    <button class="btn link" id="skipBtn" style="display:none">Skip</button>
-    <button class="btn ghost" id="backBtn" style="visibility:hidden">Back</button>
-    <button class="btn primary" id="nextBtn">Get started</button>
+  <div class="card" id="tryCard" data-off="1" inert>
+    <div class="row">
+      <div class="row-label" id="tryLine" role="status" aria-live="polite">Click Try it and say something.</div>
+      <button class="btn" id="tryBtn">Try it</button>
+    </div>
+    <div class="try-out" id="tryOut" hidden><div class="sel" id="tryText"></div><div class="msg" id="tryNote"></div></div>
   </div>
+
+  <div class="quiet" id="consentCard" hidden>
+    <div class="row" id="consentRow">
+      <div class="row-label">
+        <div id="consentLabel">Share anonymous usage and crash reports</div>
+        <div class="row-desc">Never your voice or your words. You can change this in Settings.</div>
+      </div>
+      <button class="switch" id="consentSwitch" role="switch" aria-checked="true" aria-labelledby="consentLabel"></button>
+    </div>
+  </div>
+
+</main>
+</div>
+<footer class="foot" id="foot">
+  <div class="foot-in">
+    <span class="hint" id="doneHint" role="status" aria-live="polite"></span>
+    <button class="btn primary big" id="doneBtn" disabled>Done</button>
+  </div>
+</footer>
 </div>
 
 <script>
+  'use strict';
   function send(action, extra){
-    try { window.webkit.messageHandlers.freeflo.postMessage(Object.assign({action}, extra||{})); }
-    catch(e){}
+    try { window.webkit.messageHandlers.freeflo.postMessage(Object.assign({action: action}, extra || {})); }
+    catch (e) {}
   }
-  window.freefloReceive = function(name, p){
-    p = p || {};
-    if (name === 'ob_state') onState(p);
-    else if (name === 'ob_test_result') onTestResult(p);
-    else if (name === 'ob_test_state') { if (p.recording) setMic('recording'); }
-  };
-
-  const screens = [...document.querySelectorAll('.screen')];
-  const rail = [...document.querySelectorAll('#rail i')];
   const $ = id => document.getElementById(id);
-  let i = 0;
-
-  const cfg = [
-    { next:'Get started',         skip:false, hint:'↵ or click Get started' },
-    { next:'Continue',            skip:false, hint:'Grant both to continue' },
-    { next:'Start using freeflo', skip:true,  hint:'Try it, or skip ahead' },
-  ];
-
-  const state = { mic_granted:false, accessibility:false };
-  const consent = { analytics:true, crash:true };
-  document.getElementById('chkAnalytics').addEventListener('change', e => { consent.analytics = e.target.checked; });
-  document.getElementById('chkCrash').addEventListener('change', e => { consent.crash = e.target.checked; });
-
-  function render(){
-    screens.forEach((s,n)=> s.classList.toggle('on', n===i));
-    rail.forEach((r,n)=>{ r.classList.toggle('done', n<i); r.classList.toggle('active', n===i); });
-    $('stepNum').textContent = String(i+1).padStart(2,'0');
-    $('stepName').textContent = screens[i].dataset.name;
-    $('backBtn').style.visibility = i===0 ? 'hidden' : 'visible';
-    $('nextBtn').textContent = cfg[i].next;
-    $('skipBtn').style.display = cfg[i].skip ? '' : 'none';
-    $('footHint').textContent = cfg[i].hint;
-    $('nextBtn').disabled = (i===1 && !(state.mic_granted && state.accessibility));
+  const root = document.documentElement;
+  const NATIVE = window.__freefloWindow || null;
+  function el(tag, cls, text){ const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function setParts(node, parts){
+    node.textContent = '';
+    parts.forEach(p => node.appendChild(typeof p === 'string' ? document.createTextNode(p) : el('span', 'key', p.key)));
   }
 
-  $('nextBtn').addEventListener('click', ()=>{
-    if (i < screens.length-1){ i++; render(); }
-    else finish();
-  });
-  $('backBtn').addEventListener('click', ()=>{ if(i>0){ i--; render(); } });
-  $('skipBtn').addEventListener('click', ()=>{
-    if (i < screens.length-1){ i++; render(); } else finish();
-  });
-  document.addEventListener('keydown', e=>{
-    const typing = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
-    if (e.key==='Enter' && !typing && !$('nextBtn').disabled) $('nextBtn').click();
-    if (e.key==='ArrowLeft' && !typing && i>0){ i--; render(); }
-  });
+  /* ---------- look (same rules as index.html) ---------- */
+  const mqDark = matchMedia('(prefers-color-scheme: dark)');
+  const mqOpaque = [matchMedia('(prefers-reduced-transparency: reduce)'), matchMedia('(prefers-contrast: more)')];
+  const APPEARANCES = ['system', 'light', 'dark'];
+  const look = {
+    appearance: NATIVE && APPEARANCES.includes(NATIVE.appearance) ? NATIVE.appearance : 'system',
+    glass: !!(NATIVE && (NATIVE.glass_wanted != null ? NATIVE.glass_wanted : NATIVE.glass)),
+    blocked: !!(NATIVE && NATIVE.glass_wanted && !NATIVE.glass)
+  };
+  function applyLook(){
+    root.dataset.theme = look.appearance;
+    root.dataset.mode = look.appearance === 'system' ? (mqDark.matches ? 'dark' : 'light') : look.appearance;
+    const opaque = look.blocked || mqOpaque.some(m => m.matches);
+    root.dataset.glass = (look.glass && !opaque) ? 'on' : 'off';
+  }
+  function hexRgb(h){ const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '')); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function rgbHex(c){ return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
+  function luminance(c){ const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+  function setAccent(hex){
+    const rgb = hexRgb(hex); if (!rgb) return;
+    let fill = rgb.slice();
+    for (let i = 0; i < 20 && 1.05 / (luminance(fill) + 0.05) < 4.6; i++) fill = fill.map(v => v * 0.94);
+    root.style.setProperty('--accent', rgbHex(rgb));
+    root.style.setProperty('--accent-fill', rgbHex(fill));
+  }
+  function onWindowStyle(p){
+    if (APPEARANCES.includes(p.appearance)) look.appearance = p.appearance;
+    if (p.glass_wanted != null) look.glass = !!p.glass_wanted;
+    look.blocked = !!p.glass_wanted && !p.glass;
+    if (p.accent) setAccent(p.accent);
+    applyLook();
+  }
+  mqDark.addEventListener('change', applyLook);
+  mqOpaque.forEach(m => m.addEventListener('change', applyLook));
 
-  $('grantMic').addEventListener('click', ()=>{ $('grantMic').textContent='Requesting…'; send('ob_grant_mic'); });
-  $('grantAcc').addEventListener('click', ()=>{ $('grantAcc').textContent='Opening…'; send('ob_grant_accessibility'); });
+  /* ---------- permissions ---------- */
+  const KEY_LABELS = {left_option: 'Left Option', right_option: 'Right Option', right_command: 'Right Command', right_control: 'Right Control'};
+  const ROWS = {mic: $('rowMic'), accessibility: $('rowAx')};
+  const GRANT = {mic: 'ob_grant_mic', accessibility: 'ob_grant_accessibility'};
+  const ACTIONS = ['grant_mic', 'open_mic_settings', 'grant_accessibility', 'open_accessibility_settings'];
+  const KNOWN = ['checking', 'needed', 'waiting', 'denied', 'granted', 'blocked'];
+  let P = null, finishing = false;
 
-  function pillOK(text){ const s=document.createElement('span'); s.className='pill ok'; s.textContent=text; return s; }
-
-  function onState(p){
-    Object.assign(state, p);
-    $('micControl').innerHTML='';
-    if (state.mic_granted) $('micControl').appendChild(pillOK('Granted'));
-    else {
-      const b=document.createElement('button'); b.className='btn-mini'; b.textContent='Grant';
-      b.addEventListener('click',()=>{ b.textContent='Requesting…'; send('ob_grant_mic'); }); $('micControl').appendChild(b);
+  function views(p){
+    // The setup flow (engine/setup_state.py) describes the rows; only the
+    // listed rows are shown. No rows yet: both are being checked.
+    if (!Array.isArray(p.rows)) return {mic: {state: 'checking'}, accessibility: {state: 'checking'}};
+    const out = {};
+    p.rows.forEach(r => {
+      if (!r || !ROWS[r.id]) return;
+      const a = r.action && ACTIONS.includes(r.action.id) ? r.action : null;
+      out[r.id] = {state: KNOWN.includes(r.state) ? r.state : 'paused', hint: r.hint || '',
+                   title: r.title || '', detail: r.detail || '',
+                   button: a ? (a.label || null) : null, locked: !!r.locked};
+    });
+    return out;
+  }
+  function renderRow(id, v){
+    const row = ROWS[id];
+    row.hidden = !v;
+    if (!v) return;
+    row.dataset.state = v.state;
+    row.dataset.locked = v.locked ? '1' : '0';
+    if (v.title) row.querySelector('.row-title').textContent = v.title;
+    if (v.detail) row.querySelector('.row-detail').textContent = v.detail;
+    const hint = row.querySelector('.row-hint');
+    hint.textContent = v.hint || ''; hint.hidden = !v.hint;
+    let btn = row.querySelector('.row-btn');
+    const want = v.button && !['granted', 'blocked', 'checking'].includes(v.state);
+    if (!want){ if (btn) btn.remove(); return; }
+    if (!btn){
+      btn = el('button', 'btn row-btn');
+      // Python answers with a new ob_state (what the row says next).
+      btn.addEventListener('click', () => send(GRANT[id]));
+      row.insertBefore(btn, row.querySelector('.row-hint'));
     }
-    $('accControl').innerHTML='';
-    if (state.accessibility) $('accControl').appendChild(pillOK('Granted'));
-    else {
-      const b=document.createElement('button'); b.className='btn-mini'; b.textContent='Grant';
-      b.addEventListener('click',()=>{ b.textContent='Opening…'; send('ob_grant_accessibility'); }); $('accControl').appendChild(b);
+    btn.textContent = v.button; btn.disabled = !!v.locked;
+  }
+  function keyLabel(p){ return p.ptt_label || KEY_LABELS[p.ptt_key] || 'Left Option'; }
+  function allGranted(v){ const ids = Object.keys(v); return ids.length > 0 && ids.every(id => v[id].state === 'granted'); }
+  function render(){
+    const p = P || {};
+    const v = P ? views(p) : {mic: {state: 'checking'}, accessibility: {state: 'checking'}};
+    Object.keys(ROWS).forEach(id => renderRow(id, v[id]));
+    const done = allGranted(v);
+    // title
+    if (p.title) $('obTitle').textContent = p.title;
+    else $('obTitle').textContent = done ? 'You’re all set' : 'Set up freeflo';
+    if (p.subtitle) $('obSub').textContent = p.subtitle;
+    else if (done) setParts($('obSub'), ['Hold ', {key: keyLabel(p)}, ' and speak. Your words are typed where your cursor is.']);
+    else $('obSub').textContent = 'Two quick permissions. macOS asks once for each.';
+    // try it
+    const micOk = (v.mic ? v.mic.state === 'granted' : !!(p.mic_granted || p.mic === 'granted'));
+    const card = $('tryCard');
+    card.dataset.off = micOk ? '0' : '1';
+    if (micOk) card.removeAttribute('inert'); else card.setAttribute('inert', '');
+    if (tryState === 'idle') renderTryIdle(p, v);
+    // done
+    const can = !!p.can_finish;
+    $('doneBtn').disabled = !P || !can || finishing;
+    // consent: asked on first run only, never in a repair / review window
+    $('consentCard').hidden = !askConsent();
+    $('doneHint').textContent = (!can && P) ? 'Allow both to finish. You can also close this window and come back from the menu bar icon.' : '';
+    footEdge();
+  }
+  // A hairline over the bottom bar while the column continues under it.
+  function footEdge(){
+    const s = $('scroll');
+    $('foot').dataset.edge = (s.scrollHeight - s.clientHeight - s.scrollTop > 1) ? '1' : '0';
+  }
+  $('scroll').addEventListener('scroll', footEdge, {passive: true});
+  window.addEventListener('resize', footEdge);
+
+  /* ---------- try it ---------- */
+  let tryState = 'idle';
+  function renderTryIdle(p, v){
+    const ax = v.accessibility ? v.accessibility.state === 'granted' : !!p.accessibility;
+    if (p.try_hotkey && ax) setParts($('tryLine'), ['Hold ', {key: keyLabel(p)}, ' and say something. Or click Try it.']);
+    else $('tryLine').textContent = 'Click Try it and say something.';
+    const b = $('tryBtn'); b.hidden = false; b.disabled = false; b.className = 'btn'; b.textContent = 'Try it';
+  }
+  function setTry(state, via){
+    tryState = state;
+    const b = $('tryBtn'), line = $('tryLine');
+    if (state === 'recording'){
+      line.textContent = 'Listening…';
+      b.textContent = 'Stop'; b.className = 'btn primary'; b.disabled = false; b.hidden = via === 'hotkey';
+      $('tryOut').hidden = true;
+    } else if (state === 'writing'){
+      line.textContent = 'Writing…'; b.disabled = true; b.hidden = false;
+    } else render();
+  }
+  $('tryBtn').addEventListener('click', () => {
+    if (tryState === 'idle'){ $('tryOut').hidden = true; send('ob_test_start'); }
+    else if (tryState === 'recording'){ setTry('writing'); send('ob_test_stop'); }
+  });
+  function onTestState(p){
+    if (p.recording) setTry('recording', p.via);
+    else setTry('writing');
+  }
+  function onTestResult(p){
+    const t = String(p.text || '').trim();
+    $('tryText').textContent = t ? '“' + t + '”' : '';
+    $('tryText').hidden = !t;
+    $('tryNote').textContent = t ? 'That’s it. It works the same in any app.' : (p.note || 'Nothing heard. Try again.');
+    $('tryOut').hidden = false;
+    setTry('idle');
+    // The result is what they were waiting for: make sure it is on screen.
+    try { $('tryOut').scrollIntoView({block: 'nearest'}); } catch (e) {}
+    footEdge();
+  }
+
+  /* ---------- consent + done ---------- */
+  const consentSw = $('consentSwitch');
+  let consentSet = false;
+  // Only when Python says the question is being asked (first run). An
+  // older app without `consent` never gets the question from this page.
+  function askConsent(){ return !!(P && P.consent && P.consent.show); }
+  function consent(){ return consentSw.getAttribute('aria-checked') === 'true'; }
+  consentSw.addEventListener('click', () => {
+    if (!askConsent()) return;
+    const v = !consent(); consentSw.setAttribute('aria-checked', v ? 'true' : 'false');
+    send('ob_set_consent', {analytics: v, crash: v});
+  });
+  $('doneBtn').addEventListener('click', () => {
+    if ($('doneBtn').disabled) return;
+    if (askConsent()){
+      const v = consent();
+      send('ob_set_consent', {analytics: v, crash: v});
+      send('ob_complete', {analytics: v, crash: v});
+    } else send('ob_complete');
+    finishing = true; render();
+    setTimeout(() => { finishing = false; render(); }, 2000);
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const a = document.activeElement;
+    if (a && a !== document.body && /^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
+    if (!$('doneBtn').disabled){ e.preventDefault(); $('doneBtn').click(); }
+  });
+
+  /* ---------- events ---------- */
+  function onState(p){
+    P = p || {};
+    if (!consentSet && askConsent()){
+      // First run: one switch for both, on unless both are already off.
+      consentSet = true;
+      const c = P.consent;
+      consentSw.setAttribute('aria-checked', (c.analytics !== false || c.crash !== false) ? 'true' : 'false');
     }
     render();
   }
+  const HANDLERS = {
+    ob_state: onState,
+    ob_test_state: onTestState,
+    ob_test_result: onTestResult,
+    window_style: onWindowStyle,
+    window_shown: () => { lastPoll = 0; poll(); }
+  };
+  window.freefloReceive = function(name, p){
+    const h = HANDLERS[name];
+    if (h) h(p || {});
+  };
 
-  let testState='idle';
-  $('testBtn').addEventListener('click', function(){
-    if (testState==='idle'){ send('ob_test_start'); }
-    else if (testState==='recording'){ send('ob_test_stop'); setMic('processing'); }
-  });
-  function setMic(s){
-    testState = s==='processing'?'processing':(s==='recording'?'recording':'idle');
-    const dot=$('micDot'), label=$('micLabel'), btn=$('testBtn'), tr=$('transcript');
-    if (s==='recording'){ dot.classList.add('live'); label.textContent='Recording'; btn.textContent='■ Stop'; btn.disabled=false; tr.className='transcript empty'; tr.textContent='Listening…'; }
-    else if (s==='processing'){ dot.classList.remove('live'); label.textContent='Transcribing'; btn.textContent='Working…'; btn.disabled=true; tr.textContent='…'; }
-    else { dot.classList.remove('live'); label.textContent='Idle'; btn.textContent='● Record a test'; btn.disabled=false; }
+  // Live status: macOS does not tell the page when a switch is flipped in
+  // System Settings, so ask again while anything is still missing.
+  let lastPoll = 0;
+  function complete(){ return !!P && allGranted(views(P)); }
+  function poll(){
+    if (complete() || document.visibilityState !== 'visible') return;
+    lastPoll = Date.now(); send('ob_get_state_fresh');
   }
-  function onTestResult(p){
-    setMic('idle');
-    const tr=$('transcript'), text=(p.text||'').trim();
-    if (text){ tr.className='transcript'; tr.textContent=text; }
-    else { tr.className='transcript empty'; tr.textContent=p.note||'Nothing heard — try again.'; }
-  }
+  setInterval(poll, 1500);
+  window.addEventListener('focus', () => { if (Date.now() - lastPoll > 500) poll(); });
 
-  function finish(){
-    send('ob_set_consent', { analytics:consent.analytics, crash:consent.crash });
-    $('footHint').textContent='All set — opening freeflo…';
-    $('nextBtn').textContent='Done ✓'; $('nextBtn').disabled=true;
-    send('ob_complete', { analytics:consent.analytics, crash:consent.crash });
-  }
-
-  send('ob_get_state');
-  setInterval(()=>{ if (i===1) send('ob_get_state'); }, 1500);
+  if (NATIVE && NATIVE.accent) setAccent(NATIVE.accent);
+  applyLook();
   render();
+  send('ob_get_state');
 </script>
 </body>
 </html>
