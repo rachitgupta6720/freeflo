@@ -14,6 +14,8 @@ and this project follows [Semantic Versioning](https://semver.org/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-16
+
 ### Changed
 - **New speech engine: the recognition built into macOS.** freeflo now
   transcribes with Apple's on-device speech recogniser instead of a bundled
