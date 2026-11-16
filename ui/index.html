@@ -1,765 +1,1356 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="system" data-mode="light" data-glass="off">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>freeflo</title>
+<script>
+  // First paint: light or dark, solid or glass. ui/window.py injects
+  // window.__freefloWindow before this runs; without it (tests, a browser)
+  // the system setting decides and the page is solid.
+  (function(){
+    var w = window.__freefloWindow || {}, r = document.documentElement;
+    var a = (w.appearance === 'light' || w.appearance === 'dark') ? w.appearance : 'system';
+    var opaque = matchMedia('(prefers-reduced-transparency: reduce)').matches || matchMedia('(prefers-contrast: more)').matches;
+    r.dataset.theme = a;
+    r.dataset.mode = a !== 'system' ? a : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    r.dataset.glass = (w.glass && !opaque) ? 'on' : 'off';
+  })();
+</script>
 <style>
-  :root {
-    --bg:#08080a; --bg-2:#0c0c0f;
-    --surface:#111116; --surface-2:#17171c; --surface-3:#1e1e24;
-    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.12); --line-3:rgba(255,255,255,.20);
-    --text:#f5f5f6; --muted:#a0a0a8; --faint:#6b6b74;
-    --hi:#ffffff; --ink:#0a0a0c; --glow:rgba(255,255,255,.18); --ok:#dfe7e6;
-    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
-    --sans:-apple-system,"SF Pro Display",system-ui,sans-serif;
-    --r:14px; --r-sm:9px; --shadow:0 10px 40px rgba(0,0,0,.5);
-    --ease:cubic-bezier(.28,.11,.32,1);
+  /* tokens:start */
+  :root{
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --titlebar-h:32px; --traffic-w:78px;
+    --accent:#007aff; --accent-fill:#0071e3;
+    --green:#34c759; --red:#ff3b30; --orange:#ff9500;
+    --ok-text:#1f7a37; --err-text:#c5221a; --warn-text:#9a5b00;
+    --bg:#f5f5f7; --side:#eaeaec; --card:#fff; --card-border:rgba(0,0,0,.07);
+    --card-shadow:0 1px 2px rgba(0,0,0,.04);
+    --text:#1d1d1f; --text-2:#62626a; --text-3:#6e6e73;
+    --sep:rgba(60,60,67,.14);
+    --fill:rgba(120,120,128,.12); --fill-2:rgba(120,120,128,.20);
+    --btn:#fff; --btn-border:rgba(0,0,0,.13); --btn-shadow:0 .5px 1.5px rgba(0,0,0,.10);
+    --field:#fff; --field-border:rgba(0,0,0,.14);
+    --seg-on:#fff; --seg-shadow:0 1px 2.5px rgba(0,0,0,.16);
+    --switch-off:rgba(120,120,128,.30);
+    --top:rgba(245,245,247,.82);
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14' fill='none' stroke='%2362626a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5.2 5 2.2l3 3M2 8.8l3 3 3-3'/%3E%3C/svg%3E");
+    color-scheme:light;
+  }
+  :root[data-mode="dark"]{
+    --green:#30d158; --red:#ff453a; --orange:#ff9f0a;
+    --ok-text:#4cd964; --err-text:#ff6b63; --warn-text:#ffb340;
+    --bg:#1c1c1e; --side:#242426; --card:#2a2a2d; --card-border:rgba(255,255,255,.07);
+    --card-shadow:none;
+    --text:#f5f5f7; --text-2:#a4a4ab; --text-3:#98989f;
+    --sep:rgba(120,120,128,.30);
+    --fill:rgba(120,120,128,.24); --fill-2:rgba(120,120,128,.36);
+    --btn:rgba(255,255,255,.13); --btn-border:rgba(255,255,255,.06); --btn-shadow:inset 0 .5px 0 rgba(255,255,255,.16);
+    --field:rgba(255,255,255,.07); --field-border:rgba(255,255,255,.12);
+    --seg-on:rgba(255,255,255,.24); --seg-shadow:0 1px 2px rgba(0,0,0,.3);
+    --switch-off:rgba(120,120,128,.42);
+    --top:rgba(28,28,30,.82);
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14' fill='none' stroke='%23a4a4ab' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 5.2 5 2.2l3 3M2 8.8l3 3 3-3'/%3E%3C/svg%3E");
     color-scheme:dark;
   }
-  [data-theme="light"]{
-    --bg:#f5f5f6; --bg-2:#ececee; --surface:#ffffff; --surface-2:#f6f6f7; --surface-3:#ececee;
-    --line:rgba(0,0,0,.08); --line-2:rgba(0,0,0,.13); --line-3:rgba(0,0,0,.22);
-    --text:#18181b; --muted:#52525b; --faint:#8a8a92;
-    --hi:#111114; --ink:#ffffff; --glow:rgba(0,0,0,.14); --ok:#2f6f66;
-    --veil:.92; --grid:.35; --shadow:0 10px 40px rgba(0,0,0,.12); color-scheme:light;
+  /* Glass: a real system material sits behind the page (ui/window.py).
+     These veils keep text readable whatever is behind the window. */
+  :root[data-glass="on"]{
+    --bg:rgba(246,246,248,.50); --side:rgba(246,246,248,.38);
+    --card:rgba(255,255,255,.56); --card-border:rgba(255,255,255,.62);
+    --card-shadow:0 1px 0 rgba(255,255,255,.55) inset, 0 6px 20px rgba(0,0,0,.07);
+    --text-2:#3c3c43; --text-3:#55555a;
+    --sep:rgba(60,60,67,.16);
+    --fill:rgba(120,120,128,.16); --fill-2:rgba(120,120,128,.26);
+    --btn:rgba(255,255,255,.72); --field:rgba(255,255,255,.66);
+    --top:transparent;
   }
-  [data-theme="glass"]{
-    --bg:#0b0b10; --bg-2:#0c0c12;
-    --surface:rgba(255,255,255,.055); --surface-2:rgba(255,255,255,.09); --surface-3:rgba(255,255,255,.13);
-    --line:rgba(255,255,255,.14); --line-2:rgba(255,255,255,.20); --line-3:rgba(255,255,255,.30);
-    --text:#f6f6f8; --muted:#cfcfd6; --faint:#9a9aa4;
-    --hi:#ffffff; --ink:#0a0a0c; --glow:rgba(255,255,255,.28); --ok:#dfe7e6;
-    --blur:saturate(170%) blur(26px); --veil:.26; --grid:.35; --shadow:0 16px 50px rgba(0,0,0,.45); color-scheme:dark;
+  :root[data-glass="on"][data-mode="dark"]{
+    --bg:rgba(22,22,24,.48); --side:rgba(22,22,24,.38);
+    --card:rgba(66,66,72,.44); --card-border:rgba(255,255,255,.13);
+    --card-shadow:0 1px 0 rgba(255,255,255,.10) inset, 0 8px 24px rgba(0,0,0,.20);
+    --text-2:#d6d6dc; --text-3:#b4b4bb;
+    --sep:rgba(255,255,255,.13);
+    --fill:rgba(255,255,255,.12); --fill-2:rgba(255,255,255,.20);
+    --btn:rgba(255,255,255,.16); --field:rgba(255,255,255,.10);
+    --top:transparent;
   }
+  /* tokens:end */
 
+  /* ---------- base ---------- */
   *{ box-sizing:border-box; }
-  html,body{ height:100%; margin:0; }
-  body{ font:14px/1.5 var(--sans); color:var(--text); -webkit-user-select:none; user-select:none;
-    overflow:hidden; -webkit-font-smoothing:antialiased; }
-  body::before{ content:""; position:fixed; inset:0; z-index:-3;
-    background:
-      radial-gradient(760px 560px at 14% 18%, rgba(150,160,185,.30), transparent 60%),
-      radial-gradient(620px 520px at 86% 12%, rgba(196,186,208,.22), transparent 60%),
-      radial-gradient(760px 620px at 72% 96%, rgba(140,152,170,.26), transparent 60%), #0b0b10; }
-  body::after{ content:""; position:fixed; inset:0; z-index:-2; background:var(--bg); opacity:var(--veil,.90); transition:opacity .35s; }
-  .grid-bg{ position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:var(--grid,.5);
-    background-image:linear-gradient(to right,var(--line) 1px,transparent 1px),linear-gradient(to bottom,var(--line) 1px,transparent 1px);
-    background-size:44px 44px;
-    -webkit-mask-image:radial-gradient(1200px 800px at 50% 0%,#000 40%,transparent 85%);
-            mask-image:radial-gradient(1200px 800px at 50% 0%,#000 40%,transparent 85%); }
+  html,body{ height:100%; margin:0; background:transparent; }
+  body{ font:13px/1.4 var(--font); color:var(--text);
+    -webkit-font-smoothing:antialiased; -webkit-user-select:none; user-select:none;
+    cursor:default; overflow:hidden; }
+  button,input,select,textarea{ font:inherit; color:inherit; margin:0; }
+  [hidden]{ display:none !important; }
+  .sel{ -webkit-user-select:text; user-select:text; cursor:text; }
+  :focus{ outline:none; }
+  :focus-visible{ outline:3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset:1px; }
+  .input:focus-visible, .area:focus-visible, .select:focus-visible{ outline-offset:0; }
+  svg{ display:block; }
 
-  /* ---- layout ---- */
-  .app{ display:flex; height:100%; }
+  .app{ display:grid; grid-template-columns:188px minmax(0,1fr); height:100%; }
 
-  /* ---- sidebar ---- */
-  .side{ width:216px; flex:none; display:flex; flex-direction:column; padding:18px 12px; gap:4px;
-    border-right:1px solid var(--line); background:var(--surface);
-    backdrop-filter:var(--blur,none); -webkit-backdrop-filter:var(--blur,none); }
+  /* ---------- sidebar ---------- */
+  .side{ background:var(--side); border-right:1px solid var(--sep);
+    padding:calc(var(--titlebar-h) + 16px) 10px 14px; display:flex; flex-direction:column; gap:2px; }
+  .nav-btn{ display:flex; align-items:center; gap:9px; width:100%; height:32px; padding:0 12px;
+    border:0; border-radius:8px; background:transparent; text-align:left; font-weight:500; color:var(--text); }
+  .nav-btn svg{ width:17px; height:17px; flex:none; color:var(--text-2); }
+  .nav-btn:hover{ background:var(--fill); }
+  .nav-btn[aria-current="page"]{ background:var(--accent-fill); color:#fff; }
+  .nav-btn[aria-current="page"] svg{ color:inherit; }
+  .side-foot{ margin-top:auto; padding:0 12px; font-size:12px; color:var(--text-3); }
 
-  .brand{ display:flex; align-items:center; gap:10px; padding:6px 10px 16px; }
-  .nav-logo{ font-size:20px; font-weight:600; letter-spacing:-.02em; line-height:1; }
-  .nav-logo span{ background:linear-gradient(180deg,#fff,#a0a0a0);
-    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-  [data-theme="light"] .nav-logo span{
-    background:linear-gradient(180deg,#1a1a1a,#505050);
-    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  /* ---------- pane ---------- */
+  .pane{ position:relative; background:var(--bg); overflow-y:auto; overflow-x:hidden; }
+  .pane-top{ position:sticky; top:0; z-index:5; height:var(--titlebar-h); margin-bottom:calc(-1 * var(--titlebar-h));
+    pointer-events:none; background:var(--top);
+    -webkit-backdrop-filter:blur(20px) saturate(170%); backdrop-filter:blur(20px) saturate(170%);
+    -webkit-mask-image:linear-gradient(#000 55%,transparent); mask-image:linear-gradient(#000 55%,transparent); }
+  .view{ display:none; max-width:620px; margin:0 auto; padding:calc(var(--titlebar-h) + 10px) 24px 36px; }
+  .view.on{ display:block; }
+  h1{ font-size:22px; line-height:1.2; font-weight:700; margin:0 0 16px; }
+  .group-title{ display:flex; align-items:baseline; gap:8px; font-size:13px; font-weight:600; margin:24px 4px 8px; }
+  .group-title .aside{ margin-left:auto; font-weight:400; font-size:12px; color:var(--text-2); }
+  .group-foot{ font-size:12px; line-height:1.4; color:var(--text-2); margin:8px 16px 0; }
+  .group-foot:empty{ display:none; }
 
-  .nav-label{ font:10px/1 var(--mono); letter-spacing:1.6px; text-transform:uppercase; color:var(--faint); padding:10px 10px 6px; }
-  .nav{ display:flex; flex-direction:column; gap:2px; }
-  .nav a{ display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:10px; color:var(--muted);
-    cursor:pointer; font-size:13.5px; font-weight:520; position:relative; transition:color .15s, background .15s; }
-  .nav a svg{ width:17px; height:17px; opacity:.85; flex:none; }
-  .nav a:hover{ color:var(--text); background:var(--surface-2); }
-  .nav a.active{ color:var(--text); background:var(--surface-3); }
-  .nav a.active::before{ content:""; position:absolute; left:-12px; top:9px; bottom:9px; width:3px;
-    border-radius:3px; background:var(--hi); box-shadow:0 0 10px var(--glow); }
-  .nav a.accent{ color:var(--text); border:1px dashed var(--line-2); margin-top:6px; }
-  .side-foot{ margin-top:auto; padding-top:12px; }
+  .card{ background:var(--card); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--card-shadow); }
+  .row{ position:relative; display:flex; align-items:center; gap:12px; min-height:44px; padding:12px 16px; }
+  /* A hairline above every visible row that follows a visible row (a hidden
+     row in between must neither add one nor take one away). */
+  .row:not([hidden]) ~ .row::before, #bLocal ~ #bConnected > .row:first-child::before,
+  .rows > * + *::before{ content:""; position:absolute; top:0; left:16px; right:0; height:1px;
+    background:var(--sep); transform:scaleY(.5); transform-origin:top; }
+  .rows > *{ position:relative; }
+  .row-label{ flex:1; min-width:0; }
+  .row-desc{ font-size:12px; line-height:1.4; color:var(--text-2); margin-top:2px; }
+  .row-ctl{ flex:none; display:flex; align-items:center; gap:8px; }
+  .col{ display:block; }
+  .col > .row-label{ margin-bottom:8px; }
 
-  .theme{ display:flex; gap:3px; padding:3px; border:1px solid var(--line); border-radius:11px; background:var(--bg-2); margin-top:8px; }
-  .theme button{ flex:1; border:none; background:transparent; color:var(--faint); cursor:pointer; padding:7px 0;
-    border-radius:8px; font-size:11px; font-weight:600; display:grid; place-items:center; gap:2px; }
-  .theme button svg{ width:15px; height:15px; }
-  .theme button.on{ background:var(--surface-3); color:var(--text); }
-  .theme .lbl{ font-size:9px; letter-spacing:.3px; }
+  /* ---------- controls ---------- */
+  .btn{ flex:none; height:28px; padding:0 12px; border-radius:7px; border:1px solid var(--btn-border);
+    background:var(--btn); box-shadow:var(--btn-shadow); font-weight:500; white-space:nowrap; }
+  .btn:hover{ filter:brightness(.97); } .btn:active{ filter:brightness(.92); }
+  :root[data-mode="dark"] .btn:hover{ filter:brightness(1.15); }
+  .btn.primary{ background:var(--accent-fill); color:#fff; border-color:transparent; box-shadow:none; }
+  .btn.danger{ color:var(--err-text); }
+  .btn.plain{ background:transparent; border-color:transparent; box-shadow:none; color:var(--text-2); }
+  .btn.plain:hover{ background:var(--fill); filter:none; color:var(--text); }
+  .btn.icon{ width:28px; padding:0; display:grid; place-items:center; }
+  .btn.icon svg{ width:15px; height:15px; }
+  .btn:disabled, .select:disabled, .switch:disabled{ opacity:.45; pointer-events:none; }
 
-  /* ---- main content ---- */
-  .main{ flex:1; overflow:auto; padding:24px 28px 40px; }
-  .view{ display:none; } .view.on{ display:block; animation:rise .4s var(--ease); }
-  @keyframes rise{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+  .select{ -webkit-appearance:none; appearance:none; height:28px; max-width:240px; padding:0 28px 0 10px;
+    border-radius:7px; border:1px solid var(--btn-border); background:var(--btn) var(--chev) no-repeat right 9px center;
+    box-shadow:var(--btn-shadow); font-weight:500; text-overflow:ellipsis; }
+  .input, .area{ width:100%; border-radius:7px; border:1px solid var(--field-border); background:var(--field);
+    -webkit-user-select:text; user-select:text; cursor:text; }
+  .input{ height:28px; padding:0 10px; }
+  .area{ display:block; padding:8px 10px; line-height:1.4; resize:none; }
+  .input::placeholder, .area::placeholder{ color:var(--text-3); }
 
-  .head{ display:flex; align-items:flex-end; gap:14px; margin-bottom:20px; }
-  .head h1{ font-size:22px; font-weight:660; letter-spacing:-.4px; margin:0; }
-  .head p{ margin:2px 0 0; color:var(--muted); font-size:13px; }
-  .head .right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+  .switch{ flex:none; position:relative; width:38px; height:22px; padding:0; border:0; border-radius:11px;
+    background:var(--switch-off); transition:background .18s; }
+  .switch::after{ content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.04); transition:transform .18s; }
+  .switch[aria-checked="true"]{ background:var(--accent); }
+  .switch[aria-checked="true"]::after{ transform:translateX(16px); }
 
-  .pill{ font:11px/1 var(--mono); letter-spacing:.5px; padding:7px 12px; border-radius:999px;
-    border:1px solid var(--line-2); color:var(--muted); background:var(--surface); white-space:nowrap; }
-  .pill.live{ color:var(--text); }
-  .pill .dot{ display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px;
-    background:var(--faint); vertical-align:middle; }
-  .pill.live .dot{ background:var(--ok); box-shadow:0 0 9px var(--glow); animation:breathe 1.6s infinite; }
-  @keyframes breathe{ 0%,100%{opacity:.5} 50%{opacity:1} }
+  .seg{ display:inline-flex; padding:3px; border-radius:9px; background:var(--fill); }
+  .seg button{ height:22px; padding:0 12px; border:0; border-radius:6px; background:transparent; font-weight:500; color:var(--text);
+    transition:background .15s; }
+  .seg button[aria-pressed="true"]{ background:var(--seg-on); box-shadow:var(--seg-shadow); }
 
-  .card{ position:relative; background:var(--surface); border:1px solid var(--line);
-    border-radius:var(--r); box-shadow:var(--shadow);
-    backdrop-filter:var(--blur,none); -webkit-backdrop-filter:var(--blur,none); }
-  .hud::before,.hud::after{ content:""; position:absolute; width:9px; height:9px;
-    border-color:var(--line-3); border-style:solid; pointer-events:none; }
-  .hud::before{ top:-1px; left:-1px; border-width:1px 0 0 1px; }
-  .hud::after{ bottom:-1px; right:-1px; border-width:0 1px 1px 0; }
+  .key{ display:inline-block; padding:1px 8px; border-radius:5px; background:var(--fill); border:1px solid var(--sep);
+    font-size:12px; font-weight:600; line-height:16px; white-space:nowrap; vertical-align:1px; }
+  .tag{ display:inline-block; padding:1px 8px; border-radius:5px; background:var(--fill); font-size:12px; line-height:16px; color:var(--text-2); }
+  .ok{ color:var(--ok-text); } .err{ color:var(--err-text); } .muted{ color:var(--text-2); }
+  .msg{ font-size:12px; line-height:1.4; color:var(--text-2); }
+  .msg:empty{ display:none; }
+  .msg.ok{ color:var(--ok-text); } .msg.err{ color:var(--err-text); }
+  .tick{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--ok-text); white-space:nowrap; }
+  .tick svg{ width:13px; height:13px; }
+  .bar{ height:4px; border-radius:2px; background:var(--fill-2); overflow:hidden; }
+  .bar i{ display:block; height:100%; width:0; border-radius:2px; background:var(--accent); transition:width .18s; }
 
-  kbd{ font:12px/1 var(--mono); color:var(--text); padding:6px 9px; border-radius:7px; display:inline-block;
-    background:linear-gradient(180deg,var(--surface-3),var(--surface-2)); border:1px solid var(--line-2);
-    box-shadow:0 2px 0 rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06); }
-  .btn{ font:13px/1 var(--sans); font-weight:620; padding:10px 16px; border-radius:9px; cursor:pointer;
-    border:1px solid var(--line-2); background:var(--surface-3); color:var(--text); transition:all .15s; }
-  .btn:hover{ border-color:var(--line-3); } .btn:active{ transform:translateY(1px); }
-  .btn.primary{ background:var(--hi); color:var(--ink); border-color:var(--hi); box-shadow:0 6px 22px var(--glow); }
-  .btn.ghost{ background:transparent; color:var(--muted); }
-  .btn:disabled{ opacity:.5; cursor:default; }
-  .toggle{ width:42px; height:25px; flex:none; border-radius:999px; cursor:pointer;
-    background:var(--surface-3); border:1px solid var(--line-2); position:relative; transition:.2s; }
-  .toggle::after{ content:""; position:absolute; top:2px; left:2px; width:19px; height:19px; border-radius:50%;
-    background:#8b8b93; transition:.2s cubic-bezier(.3,1.4,.5,1); }
-  .toggle.on{ background:var(--hi); border-color:var(--hi); } .toggle.on::after{ left:19px; background:var(--ink); }
-  .empty{ text-align:center; color:var(--faint); padding:34px 0; }
-  .badge{ font:10px/1 var(--mono); color:var(--muted); border:1px solid var(--line-2); border-radius:999px;
-    padding:4px 9px; background:var(--bg-2); white-space:nowrap; }
-  .badge-ok{ font:11px/1 var(--mono); color:var(--ink); background:var(--hi); border-radius:999px; padding:5px 11px; white-space:nowrap; }
+  /* ---------- home ---------- */
+  .hero{ padding:16px; }
+  .hero-main{ display:flex; align-items:center; gap:14px; }
+  .orb{ flex:none; width:44px; height:44px; border-radius:50%; display:grid; place-items:center;
+    background:color-mix(in srgb, var(--green) 18%, transparent); color:var(--ok-text); }
+  .orb svg{ width:22px; height:22px; }
+  .orb .i-alert, .orb .meter{ display:none; }
+  .orb .meter{ align-items:center; gap:2.5px; height:20px; }
+  .orb .meter i{ width:3px; height:6px; border-radius:2px; background:currentColor; animation:meter .9s ease-in-out infinite; }
+  .orb .meter i:nth-child(2){ animation-delay:.15s } .orb .meter i:nth-child(3){ animation-delay:.3s } .orb .meter i:nth-child(4){ animation-delay:.45s }
+  @keyframes meter{ 0%,100%{ height:6px } 50%{ height:18px } }
+  .hero[data-state="recording"] .orb{ background:color-mix(in srgb, var(--red) 18%, transparent); color:var(--red); }
+  .hero[data-state="recording"] .orb .i-mic{ display:none; } .hero[data-state="recording"] .orb .meter{ display:flex; }
+  .hero[data-state="processing"] .orb, .hero[data-state="off"] .orb{ background:var(--fill); color:var(--text-2); }
+  .hero[data-state="attention"] .orb{ background:color-mix(in srgb, var(--orange) 20%, transparent); color:var(--warn-text); }
+  .hero[data-state="attention"] .orb .i-mic{ display:none; } .hero[data-state="attention"] .orb .i-alert{ display:block; }
+  .hero-text{ flex:1; min-width:0; }
+  .hero-title{ font-size:15px; font-weight:600; line-height:1.35; }
+  .hero-sub{ font-size:12px; color:var(--text-2); margin-top:2px; }
+  .callout{ margin:12px 0 0 58px; padding:12px 16px; border-radius:9px; background:var(--fill); line-height:1.45; }
+  .callout .msg{ margin-top:4px; }
+  .callout.notice{ display:flex; align-items:center; gap:12px; }
+  .callout.notice span{ flex:1; }
 
-  /* ===== HOME ===== */
-  .home-top{ display:grid; grid-template-columns:1.25fr 1fr; gap:16px; }
-  .orb-card{ padding:24px; display:flex; flex-direction:column; align-items:center; text-align:center; }
-  .orb{ position:relative; width:140px; height:140px; display:grid; place-items:center; margin:4px 0 12px; }
-  .orb .ring{ position:absolute; inset:0; border-radius:50%; border:1px solid var(--line-2); }
-  .orb .ring.r2{ inset:-16px; border-style:dashed; border-color:var(--line); animation:spin 20s linear infinite; }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  .orb .core{ width:92px; height:92px; border-radius:50%; display:grid; place-items:center; cursor:pointer;
-    background:radial-gradient(circle at 50% 36%,var(--surface-3),var(--bg) 72%); border:1px solid var(--line-2);
-    box-shadow:0 0 50px var(--glow),inset 0 2px 16px rgba(0,0,0,.5); transition:transform .1s; }
-  .orb .core:active{ transform:scale(.95); }
-  .orb.rec .core{ border-color:var(--ok); box-shadow:0 0 60px var(--glow); }
-  .orb .wave{ display:flex; align-items:center; gap:3.2px; height:34px; }
-  .orb .wave span{ width:3.2px; border-radius:3px; background:var(--hi); box-shadow:0 0 7px var(--glow); animation:eq2 1.1s ease-in-out infinite; }
-  .orb.rec .wave span{ animation-duration:.5s; }
-  .orb .wave span:nth-child(1){animation-delay:0s} .orb .wave span:nth-child(2){animation-delay:.15s}
-  .orb .wave span:nth-child(3){animation-delay:.3s} .orb .wave span:nth-child(4){animation-delay:.1s}
-  .orb .wave span:nth-child(5){animation-delay:.4s}
-  @keyframes eq2{0%,100%{height:8px;opacity:.5}50%{height:32px;opacity:1}}
-  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .stat{ padding:15px 16px; }
-  .stat .k{ font:10px/1 var(--mono); letter-spacing:1px; text-transform:uppercase; color:var(--faint); }
-  .stat .v{ font-size:23px; font-weight:700; margin-top:8px; letter-spacing:-.5px; }
-  .stat .d{ font-size:11px; color:var(--muted); margin-top:3px; }
-  .section-t{ font:10px/1 var(--mono); letter-spacing:1.6px; text-transform:uppercase; color:var(--faint);
-    margin:24px 0 12px; display:flex; align-items:center; gap:10px; }
-  .section-t::after{ content:""; flex:1; height:1px; background:var(--line); }
-  .recent .row{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); }
-  .recent .row:last-child{ border-bottom:none; }
-  .recent .t{ font:11px/1 var(--mono); color:var(--faint); width:48px; flex:none; }
-  .recent .x{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .item{ display:flex; align-items:flex-start; gap:10px; padding:12px 16px; }
+  .item-body{ flex:1; min-width:0; }
+  .item-text{ line-height:1.45; white-space:pre-wrap; word-break:break-word; }
+  .item-text.clamp{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; }
+  .item-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px; font-size:12px; color:var(--text-2); }
+  .item-acts{ flex:none; display:flex; align-items:center; gap:2px; margin:-4px -8px 0 0; }
+  .star[aria-pressed="true"]{ color:var(--orange); }
+  .star[aria-pressed="true"] svg{ fill:currentColor; }
+  .empty{ padding:24px 16px; text-align:center; color:var(--text-2); }
+  .more{ justify-content:center; min-height:44px; padding:10px 16px; }
 
-  /* ===== HISTORY ===== */
-  .h-top{ display:flex; gap:10px; align-items:center; margin-bottom:16px; }
-  .search{ flex:1; position:relative; }
-  .search input{ width:100%; padding:11px 12px 11px 36px; font-size:13.5px; color:var(--text);
-    background:var(--surface); border:1px solid var(--line-2); border-radius:10px; outline:none;
-    backdrop-filter:var(--blur,none); -webkit-user-select:text; user-select:text; }
-  .search svg{ position:absolute; left:12px; top:11px; width:16px; height:16px; color:var(--faint); }
-  .switch{ display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12.5px; white-space:nowrap; cursor:pointer; }
-  .entry{ padding:13px 15px; margin-bottom:9px; }
-  .entry .meta{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-  .entry .meta .t{ font:11px/1 var(--mono); color:var(--faint); }
-  .entry .meta .copy{ background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; }
-  .entry .meta .acts{ margin-left:auto; display:flex; align-items:center; gap:6px; }
-  .heart{ background:none; border:none; cursor:pointer; color:var(--faint); padding:0 2px; transition:color .15s; font-size:15px; line-height:1; }
-  .heart:hover{ color:var(--text); }
-  .heart.filled{ color:#e25555; }
-  .entry .x{ -webkit-user-select:text; user-select:text; font-size:14px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+  /* ---------- history ---------- */
+  .tools{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .search{ position:relative; flex:1; min-width:0; }
+  .search svg{ position:absolute; left:9px; top:7px; width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+  .search .input{ padding-left:28px; }
+  .add-form{ padding:16px; margin-bottom:12px; }
+  .add-form .acts{ display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
 
-  /* ===== SETTINGS ===== */
-  .settings-group{ margin-bottom:24px; }
-  .group-title{ font:10px/1 var(--mono); letter-spacing:1.6px; text-transform:uppercase; color:var(--faint);
-    margin-bottom:12px; display:flex; align-items:center; gap:10px; }
-  .group-title::after{ content:""; flex:1; height:1px; background:var(--line); }
+  /* ---------- settings ---------- */
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .chips:empty, .reps:empty{ display:none; }
+  .chip{ display:inline-flex; align-items:center; gap:2px; height:24px; padding:0 4px 0 10px; border-radius:12px; background:var(--fill); }
+  .x{ flex:none; width:20px; height:20px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--text-2);
+    display:grid; place-items:center; font-size:15px; line-height:1; }
+  .x:hover{ background:var(--fill-2); color:var(--text); }
+  .inline{ display:flex; align-items:center; gap:8px; }
+  .inline .input{ flex:1; min-width:0; }
+  .arrow{ flex:none; color:var(--text-3); }
+  .reps{ margin-top:10px; }
+  .rep{ display:flex; align-items:center; gap:8px; padding:4px 0; }
+  .rep span{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rep .h{ color:var(--text-2); }
+  .rep .arrow{ flex:none; }
+  .lang-state{ display:flex; align-items:center; gap:8px; min-height:20px; margin-top:4px; font-size:12px; color:var(--text-2); }
+  .lang-state:empty, .lang-badge:empty{ display:none; }   /* ready: nothing to say */
+  .lang-state .bar{ flex:1; max-width:140px; }
+  .lang-badge{ flex:none; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-2); }
+  .lang-badge .bar{ width:70px; }
+  .lang-state .btn{ height:24px; padding:0 10px; }
+  .confirm{ display:flex; align-items:center; gap:8px; }
 
-  .field{ padding:18px 20px; }
-  .field + .field{ border-top:1px solid var(--line); }
-  .field .lab{ display:flex; align-items:center; gap:8px; font-weight:620; margin-bottom:5px; }
-  .field .tag{ font:10px/1 var(--mono); color:var(--faint); border:1px solid var(--line-2);
-    padding:3px 7px; border-radius:999px; text-transform:uppercase; letter-spacing:.5px; }
-  .field .desc{ color:var(--muted); font-size:12.5px; margin:0 0 12px; }
-  .picker{ display:flex; gap:8px; flex-wrap:wrap; }
-  .picker.lang-grid{ display:grid; grid-template-columns:repeat(3,1fr); }
-  .opt{ padding:9px 13px; border-radius:9px; border:1px solid var(--line-2); background:var(--bg-2);
-    color:var(--muted); cursor:pointer; font:12px/1 var(--mono); text-align:center; }
-  .opt.sel{ color:var(--text); border-color:var(--line-3); background:var(--surface-3); box-shadow:0 0 0 1px var(--line-3); }
-  .savemsg{ font-size:12.5px; min-height:16px; }
-  .savemsg.ok{ color:var(--ok); } .savemsg.err{ color:#ff8f8f; }
+  details.card{ margin-top:24px; }
+  details.card > summary{ list-style:none; display:flex; align-items:center; gap:12px; min-height:44px; padding:12px 16px; border-radius:12px; }
+  details.card > summary::-webkit-details-marker{ display:none; }
+  details.card > summary .chevron{ flex:none; width:12px; height:12px; color:var(--text-2); }
+  details.card[open] > summary .chevron{ transform:rotate(90deg); }
+  details.card[open] > summary{ border-radius:12px 12px 0 0; }
+  details.card > .rows{ border-top:1px solid var(--sep); }
 
-  .s-row{ display:flex; align-items:center; gap:14px; padding:15px 18px; border-bottom:1px solid var(--line); }
-  .s-row:last-child{ border-bottom:none; }
-  .s-row .ico{ width:38px; height:38px; flex:none; border-radius:10px; display:grid; place-items:center;
-    border:1px solid var(--line-2); background:var(--surface-2); color:var(--muted); }
-  .s-row .ico svg{ width:19px; height:19px; }
-  .s-row .txt{ flex:1; min-width:0; }
-  .s-row .txt h3{ margin:0 0 3px; font-size:14px; }
-  .s-row .txt p{ margin:0; color:var(--muted); font-size:12.5px; }
-  .shield{ display:flex; gap:12px; align-items:flex-start; padding:14px 16px; margin-top:10px;
-    background:linear-gradient(180deg,rgba(127,127,140,.06),transparent); border:1px solid var(--line); border-radius:var(--r); }
-  .shield svg{ flex:none; margin-top:1px; }
-  .shield b{ font-weight:640; }
-  .shield p{ margin:2px 0 0; color:var(--muted); font-size:12.5px; }
-  .link-btn{ background:none; border:none; color:var(--faint); font-size:12px; text-decoration:underline; cursor:pointer; padding:0; }
-  .bar{ height:6px; margin-top:8px; background:var(--surface-3); border-radius:3px; overflow:hidden; }
-  .bar i{ display:block; height:100%; background:var(--hi); width:0; transition:width .2s; }
-  .msg-line{ font-size:12.5px; min-height:16px; margin-top:10px; color:#ff8f8f; }
-  #turboStyle{ width:100%; font:13px/1 var(--sans); padding:10px 12px; border-radius:9px; cursor:pointer;
-    border:1px solid var(--line-2); background:var(--surface-3); color:var(--text); }
-
-  /* ===== SAVED ===== */
-  .add-form{ margin-bottom:16px; }
-  .add-form textarea{ -webkit-user-select:text; user-select:text; width:100%; resize:none; height:90px;
-    padding:12px 14px; font:14px/1.5 var(--sans); color:var(--text); background:var(--bg-2);
-    border:1px solid var(--line-2); border-radius:10px; outline:none; margin-bottom:8px; }
-  .add-form textarea::placeholder{ color:var(--faint); }
-  .add-form .add-actions{ display:flex; gap:8px; }
-
-  /* ===== FEEDBACK ===== */
-  .req-form{ max-width:540px; }
-  .form-label{ font:11px/1 var(--mono); letter-spacing:1px; text-transform:uppercase; color:var(--faint); margin:18px 0 8px; }
-  .form-label:first-child{ margin-top:0; }
-  .type-picker{ display:flex; gap:8px; }
-  .type-picker .opt{ font-size:12.5px; font-family:var(--sans); font-weight:520; padding:9px 14px; }
-  .req-form input[type=text]{ width:100%; padding:11px 14px; font:14px/1.4 var(--sans); color:var(--text);
-    background:var(--bg-2); border:1px solid var(--line-2); border-radius:10px; outline:none;
-    -webkit-user-select:text; user-select:text; }
-  .req-form textarea{ -webkit-user-select:text; user-select:text; width:100%; resize:none; height:110px;
-    padding:12px 14px; font:14px/1.5 var(--sans); color:var(--text); background:var(--bg-2);
-    border:1px solid var(--line-2); border-radius:10px; outline:none; }
-  .req-form input::placeholder, .req-form textarea::placeholder{ color:var(--faint); }
-  .req-foot{ display:flex; align-items:center; gap:14px; margin-top:18px; }
-  .req-foot .ok-msg{ font-size:12.5px; color:var(--ok); min-height:16px; }
+  @media (max-width:640px){ .app{ grid-template-columns:150px minmax(0,1fr); } .view{ padding-left:16px; padding-right:16px; } }
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{ animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
-<div class="grid-bg"></div>
 <div class="app">
 
-  <!-- ===== SIDEBAR ===== -->
-  <aside class="side">
-    <div class="brand">
-      <div class="nav-logo"><span>freeflo</span></div>
-    </div>
+  <nav class="side" aria-label="Sections">
+    <button class="nav-btn" data-view="home" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z"/></svg>
+      Home</button>
+    <button class="nav-btn" data-view="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      History</button>
+    <button class="nav-btn" data-view="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+      Settings</button>
+    <div class="side-foot" id="versionLine" hidden></div>
+  </nav>
 
-    <div class="nav-label">Workspace</div>
-    <nav class="nav" id="nav">
-      <a data-view="home" class="active">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10.5 12 3l9 7.5M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>
-        Home</a>
-      <a data-view="history">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        History</a>
-      <a data-view="saved">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></svg>
-        Saved</a>
-    </nav>
+  <main class="pane" id="pane">
+    <div class="pane-top"></div>
 
-    <div class="nav-label">Shape freeflo</div>
-    <nav class="nav">
-      <a data-view="request" class="accent">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z"/></svg>
-        Feedback</a>
-    </nav>
+    <!-- ================= HOME ================= -->
+    <section class="view on" id="v-home" aria-labelledby="t-home">
+      <h1 id="t-home">Home</h1>
 
-    <div class="side-foot">
-      <nav class="nav">
-        <a data-view="settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-          Settings</a>
-      </nav>
-      <div class="nav-label" style="padding-left:10px; margin-top:4px">Appearance</div>
-      <div class="theme" id="theme">
-        <button data-theme-set="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="lbl">System</span></button>
-        <button data-theme-set="light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">Light</span></button>
-        <button data-theme-set="dark" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12.8A8 8 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8Z"/></svg><span class="lbl">Dark</span></button>
-        <button data-theme-set="glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 3c0 5 8 5 8 12M12 3c0 4 5 5 5 10"/></svg><span class="lbl">Glass</span></button>
-      </div>
-    </div>
-  </aside>
-
-  <!-- ===== MAIN ===== -->
-  <main class="main">
-
-    <!-- HOME -->
-    <section class="view on" id="v-home">
-      <div class="head">
-        <div><h1>freeflo</h1><p>Put your cursor anywhere, hold your key, and speak.</p></div>
-        <div class="right"><span class="pill live" id="homeStatus"><span class="dot"></span>Ready</span></div>
-      </div>
-      <div class="home-top">
-        <div class="card hud orb-card">
-          <div class="orb" id="orb">
-            <div class="ring"></div><div class="ring r2"></div>
-            <div class="core" id="orbCore"><div class="wave"><span></span><span></span><span></span><span></span><span></span></div></div>
+      <div class="card hero" id="hero" data-state="ready">
+        <div class="hero-main">
+          <div class="orb" aria-hidden="true">
+            <svg class="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/></svg>
+            <svg class="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 7v6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>
+            <div class="meter"><i></i><i></i><i></i><i></i></div>
           </div>
-          <div style="font-weight:620">Tap to test — or hold <kbd id="homeKey">Left ⌥</kbd></div>
-          <p style="color:var(--muted); font-size:12.5px; margin:8px 0 0" id="orbHint">Nothing is pasted while testing here.</p>
+          <div class="hero-text">
+            <div class="hero-title" id="statusLine" role="status" aria-live="polite">Ready</div>
+            <div class="hero-sub" id="statusSub"></div>
+          </div>
+          <button class="btn" id="heroBtn">Try it</button>
         </div>
-        <div class="grid2">
-          <div class="card hud stat"><div class="k">Today</div><div class="v" id="stToday">—</div><div class="d">dictations</div></div>
-          <div class="card hud stat"><div class="k">Words</div><div class="v" id="stWords">—</div><div class="d">this week</div></div>
-          <div class="card hud stat"><div class="k">Total</div><div class="v" id="stTotal">—</div><div class="d">all time</div></div>
-          <div class="card hud stat"><div class="k">Language</div><div class="v" id="stLang" style="font-size:17px">—</div><div class="d">on-device</div></div>
+        <div class="callout" id="tryResult" hidden>
+          <div class="sel" id="tryText"></div>
+          <div class="msg" id="tryNote"></div>
+        </div>
+        <div class="callout notice" id="homeNotice" hidden>
+          <span id="homeNoticeText"></span>
+          <button class="btn" id="homeNoticeBtn">OK</button>
         </div>
       </div>
-      <div class="section-t">Recent activity</div>
-      <div class="card recent" id="recent"><div class="empty">No history yet. Dictate something!</div></div>
+
+      <div class="group-title">Language</div>
+      <div class="card" id="homeLangCard"></div>
+
+      <div class="group-title">Recent <span class="aside" id="recentAside"></span></div>
+      <div class="card rows" id="recent"><div class="empty">Your dictations will show up here.</div></div>
     </section>
 
-    <!-- HISTORY -->
-    <section class="view" id="v-history">
-      <div class="head"><div><h1>History</h1><p>Every transcription, searchable and stored locally on this Mac.</p></div></div>
-      <div class="h-top">
-        <div class="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
-          <input id="hsearch" type="search" placeholder="Search history…">
+    <!-- ================= HISTORY ================= -->
+    <section class="view" id="v-history" aria-labelledby="t-history">
+      <h1 id="t-history">History</h1>
+      <div class="tools">
+        <div class="seg" id="histTabs" role="group" aria-label="Show">
+          <button data-tab="all" aria-pressed="true">All</button>
+          <button data-tab="saved" aria-pressed="false">Saved</button>
         </div>
-        <label class="switch"><span class="toggle" id="saveToggle"></span> Save history</label>
-        <button class="btn ghost" id="clearBtn">Clear</button>
-      </div>
-      <div id="hlist"></div>
-    </section>
-
-    <!-- SAVED -->
-    <section class="view" id="v-saved">
-      <div class="head"><div><h1>Saved</h1><p>Your favourite prompts, always one click away.</p></div></div>
-      <div class="h-top">
         <div class="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
-          <input id="ssearch" type="search" placeholder="Search saved prompts…">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input class="input" id="hsearch" type="search" placeholder="Search" aria-label="Search history">
         </div>
-        <button class="btn primary" id="addSavedBtn">+ Add</button>
+        <button class="btn" id="addSavedBtn" hidden>New</button>
       </div>
-      <div id="addForm" class="add-form" style="display:none">
-        <textarea id="addText" placeholder="Type or paste a prompt to save…"></textarea>
-        <div class="add-actions">
+      <div class="card add-form" id="addForm" hidden>
+        <textarea class="area" id="addText" rows="3" placeholder="Type or paste text you want to keep" aria-label="Text to keep"></textarea>
+        <div class="acts">
+          <button class="btn plain" id="addCancelBtn">Cancel</button>
           <button class="btn primary" id="addSaveBtn">Save</button>
-          <button class="btn ghost" id="addCancelBtn">Cancel</button>
         </div>
       </div>
-      <div id="slist"></div>
+      <div class="card rows" id="hlist"><div class="empty">Your dictations will show up here.</div></div>
     </section>
 
-    <!-- SETTINGS -->
-    <section class="view" id="v-settings">
-      <div class="head"><div><h1>Settings</h1><p>Shortcuts, backup, analytics, and turbo mode.</p></div></div>
+    <!-- ================= SETTINGS ================= -->
+    <section class="view" id="v-settings" aria-labelledby="t-settings">
+      <h1 id="t-settings">Settings</h1>
 
-      <div class="settings-group">
-        <div class="group-title">Shortcut keys</div>
-        <div class="card hud">
-          <div class="field">
-            <div class="lab">Push-to-talk <span class="tag">hold</span></div>
-            <p class="desc">Record only while the key is held; release to transcribe.</p>
-            <div class="picker" id="pttPicker"></div>
-          </div>
-          <div class="field">
-            <div class="lab">Toggle <span class="tag">tap</span></div>
-            <p class="desc">Tap once to start recording, tap again to stop.</p>
-            <div class="picker" id="togglePicker"></div>
-          </div>
-          <div class="savemsg" id="scMsg" style="padding:0 20px 12px"></div>
-          <div class="field">
-            <div class="lab">Language</div>
-            <p class="desc">English uses the fast on-device model; other languages use the multilingual model.</p>
-            <div class="picker lang-grid" id="langPicker"></div>
-          </div>
+      <div class="group-title" id="g-shortcuts" style="margin-top:0">Shortcuts</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-label"><div>Hold to talk</div><div class="row-desc">Hold the key, speak, then let go.</div></div>
+          <div class="row-ctl"><select class="select" id="pttKey" aria-label="Hold to talk key"></select></div>
+        </div>
+        <div class="row">
+          <div class="row-label"><div>Tap to start and stop</div><div class="row-desc">Tap once to start, tap again when you are done.</div></div>
+          <div class="row-ctl"><select class="select" id="toggleKey" aria-label="Tap to start and stop key"></select></div>
         </div>
       </div>
+      <div class="group-foot">Press <span class="key">esc</span> while you are speaking to cancel. <span id="scMsg" role="status" aria-live="polite"></span></div>
 
-      <div class="settings-group">
-        <div class="group-title">Backup</div>
-        <div class="card hud">
-          <div class="s-row">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
-            <div class="txt"><h3>Local history</h3><p>Stored in an on-device database. Survives reinstalls.</p></div>
-            <span class="badge-ok">Always on</span>
+      <div class="group-title" id="g-language">Language</div>
+      <div class="card" id="langCard"></div>
+      <div class="group-foot" id="langFoot"></div>
+      <div class="group-foot" id="langMsg" role="status" aria-live="polite"></div>
+
+      <div class="group-title" id="g-vocabulary">Vocabulary</div>
+      <div class="card">
+        <div class="row col">
+          <div class="row-label"><div>Words and names</div><div class="row-desc">Spelled exactly this way every time.</div></div>
+          <div class="inline">
+            <input class="input" type="text" id="vWord" maxlength="60" placeholder="Add a word or name" aria-label="Word or name">
+            <button class="btn" id="vWordAdd">Add</button>
           </div>
-          <div id="bUnavailable" class="s-row" style="display:none"><div class="txt"><p>Google Backup isn't available in this build.</p></div></div>
-          <div id="bDisconnected" class="s-row" style="display:none">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 18a4 4 0 0 1-.5-7.97 5.5 5.5 0 0 1 10.6-1.6A3.75 3.75 0 0 1 17.5 18H7Z"/></svg></div>
-            <div class="txt"><h3>Google Drive backup</h3><p>Backs up after each dictation to a hidden, app-private folder — nothing else in your Drive is touched.</p></div>
-            <button class="btn primary" id="connectBtn">Connect</button>
-          </div>
-          <div id="bConnected" style="display:none">
-            <div class="s-row"><div class="txt"><h3 id="bEmail"></h3><p id="bLastSynced"></p></div><span class="badge-ok">Connected</span></div>
-            <div class="s-row"><div class="txt"><h3>Back up after each dictation</h3><p>Every new transcription is mirrored within seconds.</p></div><span class="toggle" id="bEnabledToggle"></span></div>
-            <div class="s-row" style="gap:8px"><button class="btn" id="syncNowBtn">Sync now</button><button class="btn ghost" id="disconnectBtn">Disconnect</button>
-              <button class="link-btn" id="deleteRemoteBtn" style="margin-left:auto">Delete backup from Drive…</button></div>
-          </div>
-          <div class="msg-line" id="bMsg" style="padding:0 18px 12px"></div>
+          <div class="chips" id="vWords"></div>
         </div>
-        <div class="shield">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-          <div><b>Only text leaves this Mac — never audio.</b><p>Audio is deleted the instant it's transcribed.</p></div>
+        <div class="row col">
+          <div class="row-label"><div>Replacements</div><div class="row-desc">Say one thing, get another. Good for a word that keeps coming out wrong, or for shortcuts like “my email”.</div></div>
+          <div class="inline">
+            <input class="input" type="text" id="vHeard" maxlength="80" placeholder="When I say" aria-label="When I say">
+            <span class="arrow" aria-hidden="true">→</span>
+            <input class="input" type="text" id="vWritten" maxlength="200" placeholder="Write" aria-label="Write">
+            <button class="btn" id="vRepAdd">Add</button>
+          </div>
+          <div class="reps" id="vReps"></div>
         </div>
       </div>
+      <div class="group-foot" id="vMsg" role="status" aria-live="polite"></div>
 
-      <div class="settings-group">
-        <div class="group-title">Analytics &amp; crash reports</div>
-        <div class="card hud">
-          <div class="s-row">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/></svg></div>
-            <div class="txt"><h3>Anonymous usage analytics</h3><p>Counts and app/OS version tied to a random ID — never your transcriptions.</p></div>
-            <span class="toggle" id="analyticsToggle"></span>
-          </div>
-          <div class="s-row">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4m0 4h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div>
-            <div class="txt"><h3>Crash reports</h3><p>Send the technical stack trace when freeflo crashes. No audio, no text.</p></div>
-            <span class="toggle" id="crashToggle"></span>
-          </div>
-        </div>
-        <div class="shield">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/></svg>
-          <div><b>Transcribed text and audio are always excluded.</b><p>A guarantee, not a setting.</p></div>
-        </div>
-      </div>
-
-      <div class="settings-group">
-        <div class="group-title">Turbo mode</div>
-        <div class="card hud">
-          <div class="s-row">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></div>
-            <div class="txt"><h3>Enable Turbo</h3><p>Polish every dictation with a local AI model. 100% on your Mac — text never leaves your device. Adds a little latency.</p></div>
-            <span class="toggle" id="turboToggle"></span>
-          </div>
-        </div>
-        <div class="card hud" id="turboModelsCard" style="margin-top:10px; display:none">
-          <div id="turboDownload" style="padding:16px 18px; border-bottom:1px solid var(--line); display:none">
-            <div class="s-row" style="padding:0">
-              <div class="txt"><h3>Download AI model</h3><p id="turboDlText">One-time download to enable Turbo.</p><div class="bar" style="display:none"><i></i></div></div>
-              <button class="btn" style="font-size:12px;padding:7px 12px" id="turboDlBtn">Download</button>
+      <div class="group-title" id="g-appearance">Appearance</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-label">Theme</div>
+          <div class="row-ctl">
+            <div class="seg" id="appearanceSeg" role="group" aria-label="Theme">
+              <button data-appearance="system" aria-pressed="true">System</button>
+              <button data-appearance="light" aria-pressed="false">Light</button>
+              <button data-appearance="dark" aria-pressed="false">Dark</button>
             </div>
           </div>
-          <div style="padding:16px 18px">
-            <h3 style="font-size:14px; margin:0 0 8px">Style</h3>
-            <select id="turboStyle">
-              <option value="natural">Natural — sounds like you, lightly cleaned</option>
-              <option value="casual">Casual — relaxed and friendly</option>
-              <option value="professional">Professional — polished and clear</option>
-              <option value="formal">Formal — structured and proper</option>
-            </select>
+        </div>
+        <div class="row">
+          <div class="row-label"><div id="glassLabel">Glass</div><div class="row-desc" id="glassDesc">See what is behind the window, softly blurred.</div></div>
+          <button class="switch" id="glassSwitch" role="switch" aria-checked="false" aria-labelledby="glassLabel"></button>
+        </div>
+      </div>
+
+      <div class="group-title" id="g-sound">While you dictate</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-label"><div id="soundLabel">Start and stop sounds</div><div class="row-desc">A soft sound when listening begins and ends.</div></div>
+          <button class="switch" id="soundSwitch" role="switch" aria-checked="false" aria-labelledby="soundLabel"></button>
+        </div>
+        <div class="row">
+          <div class="row-label"><div id="liveLabel">Show words as I speak</div><div class="row-desc">A preview next to the listening indicator.</div></div>
+          <button class="switch" id="liveSwitch" role="switch" aria-checked="false" aria-labelledby="liveLabel"></button>
+        </div>
+      </div>
+
+      <div class="group-title" id="g-backup">Backup</div>
+      <div class="card">
+        <div class="row" id="bLocal">
+          <div class="row-label"><div>On this Mac</div><div class="row-desc">Your history is kept on this Mac and survives reinstalling.</div></div>
+          <span class="tick"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7"/></svg>On</span>
+        </div>
+        <div class="row" id="bDisconnected" hidden>
+          <div class="row-label"><div>Google Drive</div><div class="row-desc">Keep a private copy of your history. Nothing else in your Drive is touched.</div></div>
+          <button class="btn" id="connectBtn">Connect</button>
+        </div>
+        <div id="bConnected" hidden>
+          <div class="row">
+            <div class="row-label"><div id="bEmail">Google Drive</div><div class="row-desc" id="bLastSynced"></div></div>
+            <button class="btn" id="syncNowBtn">Back up now</button>
+          </div>
+          <div class="row">
+            <div class="row-label" id="bEnabledLabel">Back up after each dictation</div>
+            <button class="switch" id="bEnabledSwitch" role="switch" aria-checked="false" aria-labelledby="bEnabledLabel"></button>
+          </div>
+          <div class="row">
+            <div class="row-label muted" id="bConfirmText">Stop using Google Drive on this Mac.</div>
+            <div class="row-ctl" id="bActions">
+              <button class="btn plain danger" id="deleteRemoteBtn">Delete backup…</button>
+              <button class="btn" id="disconnectBtn">Disconnect</button>
+            </div>
+            <div class="row-ctl confirm" id="bConfirm" hidden>
+              <button class="btn plain" id="bConfirmNo">Cancel</button>
+              <button class="btn danger" id="bConfirmYes">Disconnect</button>
+            </div>
           </div>
         </div>
       </div>
-    </section>
+      <div class="group-foot err" id="bMsg" role="status" aria-live="polite"></div>
 
-    <!-- FEEDBACK -->
-    <section class="view" id="v-request">
-      <div class="head"><div><h1>Request a feature or report a bug</h1><p>Tell us what you need — every submission is logged and routed to the roadmap.</p></div></div>
-      <div class="req-form">
-        <div class="form-label">Type</div>
-        <div class="type-picker" id="reqType">
-          <span class="opt sel">Feature request</span>
-          <span class="opt">Bug report</span>
+      <div class="group-title" id="g-privacy">Privacy</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-label"><div id="saveLabel">Keep my history</div><div class="row-desc">Turn off to stop saving what you dictate.</div></div>
+          <button class="switch" id="saveSwitch" role="switch" aria-checked="true" aria-labelledby="saveLabel"></button>
         </div>
-        <div class="form-label">Title</div>
-        <input type="text" id="reqTitle" placeholder="e.g. Add custom vocabulary support">
-        <div class="form-label">Description</div>
-        <textarea id="reqDesc" placeholder="Describe the feature you'd like or the workflow you wish existed."></textarea>
-        <div class="req-foot">
-          <button class="btn primary" id="reqSend">Submit</button>
-          <span class="ok-msg" id="reqMsg"></span>
+        <div class="row">
+          <div class="row-label" id="clearText">Delete all history</div>
+          <div class="row-ctl" id="clearActions"><button class="btn danger" id="clearBtn">Delete…</button></div>
+          <div class="row-ctl confirm" id="clearConfirm" hidden>
+            <button class="btn plain" id="clearNo">Cancel</button>
+            <button class="btn danger" id="clearYes">Delete everything</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-label"><div id="analyticsLabel">Share anonymous usage</div><div class="row-desc">Counts only, such as how often you dictate.</div></div>
+          <button class="switch" id="analyticsSwitch" role="switch" aria-checked="true" aria-labelledby="analyticsLabel"></button>
+        </div>
+        <div class="row">
+          <div class="row-label"><div id="crashLabel">Send crash reports</div><div class="row-desc">Helps fix problems when freeflo stops working.</div></div>
+          <button class="switch" id="crashSwitch" role="switch" aria-checked="true" aria-labelledby="crashLabel"></button>
         </div>
       </div>
+      <div class="group-foot">Your voice is turned into text on this Mac. What you say and what you write are never shared.</div>
+
+      <details class="card" id="advanced">
+        <summary>
+          <div class="row-label"><div>Advanced</div><div class="row-desc">Turbo, troubleshooting, updates and feedback.</div></div>
+          <svg class="chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 2.5 3.5 3.5-3.5 3.5"/></svg>
+        </summary>
+        <div class="rows">
+          <div class="row">
+            <div class="row-label"><div id="turboLabel">Turbo</div><div class="row-desc" id="turboDesc">Tidies up each dictation on this Mac before it is typed. A little slower.</div></div>
+            <button class="switch" id="turboSwitch" role="switch" aria-checked="false" aria-labelledby="turboLabel"></button>
+          </div>
+          <div class="row" id="turboDownload" hidden>
+            <div class="row-label"><div id="turboDlText">Turbo needs a one-time download.</div><div class="bar" id="turboBar" style="margin-top:6px" hidden><i></i></div></div>
+            <button class="btn" id="turboDlBtn">Download</button>
+          </div>
+          <div class="row" id="turboStyleRow" hidden>
+            <div class="row-label">Writing style</div>
+            <div class="row-ctl"><select class="select" id="turboStyle" aria-label="Writing style">
+              <option value="natural">Natural</option>
+              <option value="casual">Casual</option>
+              <option value="professional">Professional</option>
+              <option value="formal">Formal</option>
+            </select></div>
+          </div>
+          <div class="row" id="diagRow" hidden>
+            <div class="row-label"><div>Troubleshooting</div><div class="row-desc" id="diagMsg">Details that help when you report a problem.</div></div>
+            <div class="row-ctl">
+              <button class="btn" id="logsBtn" hidden>Show logs</button>
+              <button class="btn" id="diagBtn" hidden>Copy details</button>
+            </div>
+          </div>
+          <div class="row" id="setupRow" hidden>
+            <div class="row-label"><div>Setup</div><div class="row-desc">Check microphone and typing permissions again.</div></div>
+            <button class="btn" id="setupBtn">Open setup</button>
+          </div>
+          <div class="row" id="updateRow" hidden>
+            <div class="row-label"><div>Updates</div><div class="row-desc" id="updateMsg"></div></div>
+            <button class="btn" id="updateBtn">Check now</button>
+          </div>
+          <div class="row col">
+            <div class="row-label"><div>Feedback</div><div class="row-desc">Tell us what to build or what went wrong.</div></div>
+            <div class="inline" style="margin-bottom:8px">
+              <div class="seg" id="fbType" role="group" aria-label="Kind of feedback">
+                <button data-kind="Feature request" aria-pressed="true">Idea</button>
+                <button data-kind="Bug report" aria-pressed="false">Problem</button>
+              </div>
+            </div>
+            <textarea class="area" id="fbText" rows="3" placeholder="What would make freeflo better?" aria-label="Your feedback"></textarea>
+            <div class="inline" style="margin-top:8px">
+              <span class="msg" id="fbMsg" style="flex:1" role="status" aria-live="polite"></span>
+              <button class="btn" id="fbSend" style="margin-left:auto">Send</button>
+            </div>
+          </div>
+        </div>
+      </details>
     </section>
 
   </main>
 </div>
 
 <script>
+  'use strict';
+  /* ---------- bridge ---------- */
   function send(action, extra){
-    try { window.webkit.messageHandlers.freeflo.postMessage(Object.assign({action}, extra||{})); }
-    catch(e){}
+    try { window.webkit.messageHandlers.freeflo.postMessage(Object.assign({action: action}, extra || {})); }
+    catch (e) {}
   }
-  window.freefloReceive = function(name, p){
-    p = p || {};
-    if (name === 'status')              onStatus(p);
-    else if (name === 'test_result')    onResult(p);
-    else if (name === 'home')           onHome(p);
-    else if (name === 'history')        onHistory(p);
-    else if (name === 'shortcuts')      onShortcuts(p);
-    else if (name === 'shortcuts_saved') onShortcutsSaved(p);
-    else if (name === 'save_history_state') setToggle(saveToggle, p.on !== false);
-    else if (name === 'backup_status')  onBackupStatus(p);
-    else if (name === 'privacy')        onPrivacy(p);
-    else if (name === 'theme')          onTheme(p);
-    else if (name === 'feature_ack')    onFeatureAck(p);
-    else if (name === 'turbo_status')   onTurboStatus(p);
-    else if (name === 'turbo_progress') onTurboProgress(p);
-    else if (name === 'saved_prompts')  onSavedPrompts(p);
-    else if (name === 'saved_uuids')   onSavedUuids(p);
-  };
-
-  const LANG = { en:'English', hi:'Hindi', auto:'Auto', es:'Spanish', fr:'French', de:'German',
-                 zh:'Chinese', ja:'Japanese', ar:'Arabic', pt:'Portuguese' };
-  const KEYLABEL = { left_option:'Left ⌥', right_option:'Right ⌥', right_command:'Right ⌘', right_control:'Right ⌃' };
-  function fmtTime(e){ if(!e) return ''; const d=new Date(e*1000);
-    return d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
-  function setToggle(el, on){ el.classList.toggle('on', !!on); }
-
-  // theme
+  const $ = id => document.getElementById(id);
   const root = document.documentElement;
-  const themeBtns = [...document.querySelectorAll('[data-theme-set]')];
-  const mq = window.matchMedia('(prefers-color-scheme: light)');
-  let themeChoice = 'system';
-  function applyTheme(t, persist){
-    themeChoice = t;
-    themeBtns.forEach(b => b.classList.toggle('on', b.dataset.themeSet === t));
-    root.dataset.theme = (t === 'system') ? (mq.matches ? 'light' : 'dark') : t;
-    if (persist) send('set_theme', { theme: t });
+  const NATIVE = window.__freefloWindow || null;
+
+  /* ---------- small helpers ---------- */
+  function el(tag, cls, text){ const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function show(node, on){ node.hidden = !on; }
+  function isOn(sw){ return sw.getAttribute('aria-checked') === 'true'; }
+  function setSwitch(sw, on){ sw.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  function onSwitch(sw, fn){ sw.addEventListener('click', () => { const v = !isOn(sw); setSwitch(sw, v); fn(v); }); }
+  function setSeg(seg, attr, value){ seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset[attr] === value ? 'true' : 'false')); }
+  function normId(x){ return String(x == null ? '' : x).toLowerCase().replace(/_/g, '-'); }
+  function same(a, b){ return normId(a) === normId(b); }
+  function pct(f){ return Math.max(0, Math.min(100, Math.round((+f || 0) * 100))); }
+  function fmtTime(ts){
+    if (!ts) return '';
+    const d = new Date(ts * 1000), now = new Date();
+    const time = d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+    if (d.toDateString() === now.toDateString()) return time;
+    return d.toLocaleDateString([], {day: 'numeric', month: 'short'}) + ', ' + time;
   }
-  themeBtns.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeSet, true)));
-  mq.addEventListener('change', () => { if (themeChoice === 'system') applyTheme('system', false); });
-  function onTheme(p){ applyTheme(p.theme || 'system', false); }
+  function copyText(text){
+    text = String(text == null ? '' : text);
+    if (NATIVE && NATIVE.native){ send('copy_text', {text: text}); return; }
+    try { if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).catch(() => copyFallback(text)); return; } }
+    catch (e) {}
+    copyFallback(text);
+  }
+  function copyFallback(text){
+    const t = el('textarea'); t.value = text; t.style.cssText = 'position:fixed;left:-999px;top:0;opacity:0';
+    document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    t.remove();
+  }
+  // Fixed markup only: never built from data.
+  const ICON = {
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 5.5v-.2a1.8 1.8 0 0 0-1.8-1.8H6.3a1.8 1.8 0 0 0-1.8 1.8v7.4a1.8 1.8 0 0 0 1.8 1.8h.2"/></svg>',
+    done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5 9.5-10.5"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.8 2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.8l-5.1 2.7 1-5.7-4.1-4 5.7-.8L12 3.8Z"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2M6.5 7l.8 11.2a2 2 0 0 0 2 1.8h5.4a2 2 0 0 0 2-1.8L17.5 7"/></svg>'
+  };
+  function iconBtn(kind, label, extra){
+    const b = el('button', 'btn plain icon' + (extra ? ' ' + extra : '')); b.innerHTML = ICON[kind];
+    b.title = label; b.setAttribute('aria-label', label); return b;
+  }
+  function copyBtn(text){
+    const b = iconBtn('copy', 'Copy'); b.classList.add('copy');
+    b.addEventListener('click', () => {
+      copyText(text); b.innerHTML = ICON.done; b.title = 'Copied'; b.setAttribute('aria-label', 'Copied');
+      setTimeout(() => { b.innerHTML = ICON.copy; b.title = 'Copy'; b.setAttribute('aria-label', 'Copy'); }, 1200);
+    });
+    return b;
+  }
+  function progressBar(id, f){
+    const bar = el('div', 'bar'), i = el('i'); i.style.width = pct(f) + '%'; i.dataset.barOf = id; bar.appendChild(i); return bar;
+  }
 
-  // nav — loading settings triggers all three data fetches at once
-  const views = [...document.querySelectorAll('.view')];
-  document.querySelectorAll('[data-view]').forEach(a => a.addEventListener('click', () => {
-    document.querySelectorAll('.nav a').forEach(n => n.classList.toggle('active', n === a));
-    const id = a.dataset.view;
-    views.forEach(v => v.classList.toggle('on', v.id === 'v-' + id));
-    if (id === 'home')     send('get_home');
-    else if (id === 'history')  send('get_history', { query: hsearch.value.trim() });
-    else if (id === 'saved')    send('get_saved_prompts', { query: ssearch.value.trim() });
-    else if (id === 'settings') { send('get_shortcuts'); send('get_backup_status'); send('get_privacy'); send('get_turbo'); }
-  }));
-
-  // home orb
-  const orb = document.getElementById('orb'), orbCore = document.getElementById('orbCore');
-  const homeStatus = document.getElementById('homeStatus'), orbHint = document.getElementById('orbHint');
-  let recState = 'idle';
-  orbCore.addEventListener('click', () => {
-    if (recState === 'idle') send('test_start');
-    else if (recState === 'recording') { send('test_stop'); setRec('processing'); }
+  /* ---------- look: theme, glass, accent ---------- */
+  const APPEARANCES = ['system', 'light', 'dark'];
+  const mqDark = matchMedia('(prefers-color-scheme: dark)');
+  const mqOpaque = [matchMedia('(prefers-reduced-transparency: reduce)'), matchMedia('(prefers-contrast: more)')];
+  const look = {
+    appearance: NATIVE && APPEARANCES.includes(NATIVE.appearance) ? NATIVE.appearance : 'system',
+    glass: !!(NATIVE && (NATIVE.glass_wanted != null ? NATIVE.glass_wanted : NATIVE.glass)),
+    blocked: !!(NATIVE && NATIVE.glass_wanted && !NATIVE.glass)     // the window cannot show glass now
+  };
+  function applyLook(){
+    root.dataset.theme = look.appearance;
+    root.dataset.mode = look.appearance === 'system' ? (mqDark.matches ? 'dark' : 'light') : look.appearance;
+    const opaque = look.blocked || mqOpaque.some(m => m.matches);
+    root.dataset.glass = (look.glass && !opaque) ? 'on' : 'off';
+    setSeg($('appearanceSeg'), 'appearance', look.appearance);
+    setSwitch($('glassSwitch'), look.glass);
+    $('glassDesc').textContent = (look.glass && opaque)
+      ? 'Paused while Reduce Transparency or Increase Contrast is on in System Settings.'
+      : 'See what is behind the window, softly blurred.';
+  }
+  function saveLook(){
+    applyLook();
+    send('window_style', {appearance: look.appearance, glass: look.glass});
+    // `theme` is the value older versions understand ('glass' = glass on).
+    send('set_theme', {theme: look.glass ? 'glass' : look.appearance, appearance: look.appearance, glass: look.glass});
+  }
+  function onTheme(p){
+    look.glass = (p.glass != null) ? !!p.glass : p.theme === 'glass';
+    if (APPEARANCES.includes(p.appearance)) look.appearance = p.appearance;
+    else if (APPEARANCES.includes(p.theme)) look.appearance = p.theme;
+    applyLook();
+  }
+  function onWindowStyle(p){
+    if (APPEARANCES.includes(p.appearance)) look.appearance = p.appearance;
+    if (p.glass_wanted != null) look.glass = !!p.glass_wanted;
+    look.blocked = !!p.glass_wanted && !p.glass;
+    if (p.accent) setAccent(p.accent);
+    applyLook();
+  }
+  function hexRgb(h){ const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '')); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function rgbHex(c){ return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
+  function luminance(c){ const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+  function contrastWithWhite(c){ return 1.05 / (luminance(c) + 0.05); }
+  function setAccent(hex){
+    const rgb = hexRgb(hex); if (!rgb) return;
+    let fill = rgb.slice();
+    for (let i = 0; i < 20 && contrastWithWhite(fill) < 4.6; i++) fill = fill.map(v => v * 0.94);
+    root.style.setProperty('--accent', rgbHex(rgb));
+    root.style.setProperty('--accent-fill', rgbHex(fill));
+  }
+  mqDark.addEventListener('change', applyLook);
+  mqOpaque.forEach(m => m.addEventListener('change', applyLook));
+  $('appearanceSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    look.appearance = b.dataset.appearance; saveLook();
   });
-  function setRec(s){
-    recState = s;
-    orb.classList.toggle('rec', s === 'recording');
-    if (s === 'recording'){ homeStatus.innerHTML='<span class="dot"></span>Recording'; orbHint.textContent='Listening… tap to stop'; }
-    else if (s === 'processing'){ homeStatus.innerHTML='<span class="dot"></span>Transcribing'; orbHint.textContent='Working…'; }
-    else { homeStatus.innerHTML='<span class="dot"></span>Ready'; }
+  onSwitch($('glassSwitch'), on => { look.glass = on; saveLook(); });
+
+  /* ---------- navigation ---------- */
+  const VIEWS = ['home', 'history', 'settings'];
+  const SECTIONS = ['shortcuts', 'language', 'vocabulary', 'appearance', 'sound', 'backup', 'privacy', 'advanced', 'feedback'];
+  let view = 'home';
+  function enterRequests(name){
+    if (name === 'home'){ send('get_home'); send('get_shortcuts'); send('get_languages'); }
+    else if (name === 'history'){ loadHistory(); }
+    else {
+      send('get_shortcuts'); send('get_languages'); send('get_vocabulary'); send('get_backup_status');
+      send('get_privacy'); send('get_turbo'); send('get_theme'); send('get_about');
+    }
+  }
+  function go(name, section){
+    let tab = null;
+    if (name === 'saved'){ name = 'history'; tab = 'saved'; }
+    if (name === 'request' || name === 'feedback'){ name = 'settings'; section = 'feedback'; }
+    if (!VIEWS.includes(name)) return;
+    view = name;
+    document.querySelectorAll('.nav-btn').forEach(b => { if (b.dataset.view === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    VIEWS.forEach(v => $('v-' + v).classList.toggle('on', v === name));
+    $('pane').scrollTop = 0;
+    if (name === 'history' && tab){ histTab = tab; setSeg($('histTabs'), 'tab', histTab); }
+    enterRequests(name);
+    if (name === 'settings' && SECTIONS.includes(section)){
+      if (section === 'feedback' || section === 'advanced') $('advanced').open = true;
+      const target = section === 'feedback' ? $('fbText') : (section === 'advanced' ? $('advanced') : $('g-' + section));
+      setTimeout(() => { target.scrollIntoView({block: 'start'}); if (section === 'feedback') target.focus(); }, 0);
+    }
+  }
+  let lastRefresh = 0;
+  function refreshCurrent(){ lastRefresh = Date.now(); enterRequests(view); }
+  window.addEventListener('focus', () => { if (Date.now() - lastRefresh >= 1000) refreshCurrent(); });
+  document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => go(b.dataset.view)));
+  document.addEventListener('keydown', e => {
+    const nav = e.target.closest && e.target.closest('.nav-btn');
+    if (nav && !e.metaKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')){
+      const all = [...document.querySelectorAll('.nav-btn')], i = all.indexOf(nav);
+      const next = all[(i + (e.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length];
+      e.preventDefault(); next.focus(); go(next.dataset.view); return;
+    }
+    if (!e.metaKey || e.altKey || e.ctrlKey) return;
+    if (e.key === '1' || e.key === '2' || e.key === '3'){ e.preventDefault(); go(VIEWS[+e.key - 1]); }
+    else if (e.key === 'f'){ e.preventDefault(); if (view !== 'history') go('history'); $('hsearch').focus(); }
+    else if (e.key === ','){ e.preventDefault(); go('settings'); }
+  });
+
+  /* ---------- home ---------- */
+  const KEYS = {left_option: 'Left ⌥', right_option: 'Right ⌥', right_command: 'Right ⌘', right_control: 'Right ⌃'};
+  const home = {ptt: 'left_option', toggle: 'right_option', enabled: true, alert: null, rec: 'idle'};
+  let heroAction = 'try';
+  function keyLabel(id){ return KEYS[id] || 'Left ⌥'; }
+  function setParts(node, parts){
+    node.textContent = '';
+    parts.forEach(p => node.appendChild(typeof p === 'string' ? document.createTextNode(p) : el('span', 'key', p.key)));
+  }
+  function renderStatus(){
+    const hero = $('hero'), line = $('statusLine'), sub = $('statusSub'), btn = $('heroBtn');
+    let al = home.alert && home.alert.text ? home.alert : null;
+    // "Hindi isn't downloaded yet" goes away as soon as its download runs.
+    if (al && al.action === 'install_language'){ const r = langRow(al.code); if (r && r.state !== 'available') al = null; }
+    // Information, not a blocker: dictation works, so the hero stays Ready.
+    const notice = al && (al.action === 'ack_language_notice' || al.level === 'info');
+    btn.hidden = false; btn.disabled = false; btn.className = 'btn'; btn.textContent = 'Try it'; sub.hidden = false;
+    let state;
+    if (home.rec === 'recording'){
+      state = 'recording'; heroAction = 'stop';
+      line.textContent = 'Listening…'; sub.textContent = 'Say something, then press Stop.';
+      btn.textContent = 'Stop'; btn.className = 'btn primary';
+    } else if (home.rec === 'processing'){
+      state = 'processing'; heroAction = null;
+      line.textContent = 'Writing…'; sub.textContent = 'One moment.'; btn.disabled = true;
+    } else if (!home.enabled){
+      state = 'off'; heroAction = null;
+      line.textContent = 'Dictation is turned off'; sub.textContent = 'Turn it back on from the freeflo icon in the menu bar.';
+      btn.hidden = true;
+    } else if (al && !notice){
+      state = 'attention'; heroAction = 'alert';
+      line.textContent = al.text; sub.textContent = ''; sub.hidden = true;
+      btn.textContent = al.button || 'Fix'; btn.className = 'btn primary'; btn.hidden = !al.action;
+    } else {
+      state = 'ready'; heroAction = 'try';
+      setParts(line, ['Ready — hold ', {key: keyLabel(home.ptt)}, ' to dictate']);
+      setParts(sub, ['Speak, then let go. Or tap ', {key: keyLabel(home.toggle)}, ' to start and stop.']);
+    }
+    hero.dataset.state = state;
+    if (state === 'attention') show($('tryResult'), false);
+    show($('homeNotice'), !!notice && state !== 'attention');
+    if (notice){
+      $('homeNoticeText').textContent = al.text;
+      $('homeNoticeBtn').textContent = al.button || 'OK';
+      show($('homeNoticeBtn'), !!al.action);
+    }
+  }
+  $('heroBtn').addEventListener('click', () => {
+    if (heroAction === 'try'){ show($('tryResult'), false); send('test_start'); }
+    else if (heroAction === 'stop'){ home.rec = 'processing'; renderStatus(); send('test_stop'); }
+    else if (heroAction === 'alert') runAlert(home.alert);
+  });
+  $('homeNoticeBtn').addEventListener('click', () => runAlert(home.alert));
+  // What the button of a Home alert may do. Each message is spelled out
+  // here (never built from what Python sent); anything else does nothing.
+  function runAlert(al){
+    const a = al && al.action ? String(al.action) : '';
+    if (a === 'go_settings') go('settings', 'language');
+    else if (a === 'install_language'){ if (al.code || al.id){ download(String(al.code || al.id)); renderStatus(); } }
+    else if (a === 'open_setup') send('open_setup');
+    else if (a === 'open_mic_settings') send('open_mic_settings');
+    else if (a === 'ack_language_notice') send('ack_language_notice');
   }
   function onStatus(p){
-    if (p.state === 'recording') setRec('recording');
-    else if (p.state === 'processing') setRec('processing');
-    else if (p.state === 'busy'){ setRec('idle'); orbHint.textContent = p.message || 'Busy…'; }
-    else setRec('idle');
+    home.rec = (p.state === 'recording' || p.state === 'processing') ? p.state : 'idle';
+    renderStatus();
+    if (p.state === 'busy') showTry('', p.message || 'Busy, try again in a moment.');
   }
-  function onResult(p){
-    setRec('idle');
-    const t = (p.text || '').trim();
-    orbHint.textContent = t ? ('"' + t + '"') : (p.note || 'Nothing heard — try again.');
+  function showTry(text, note){
+    $('tryText').textContent = text ? '“' + text + '”' : '';
+    show($('tryText'), !!text);
+    $('tryNote').textContent = note || '';
+    show($('tryResult'), true);
+  }
+  function onTestResult(p){
+    home.rec = 'idle'; renderStatus();
+    const t = String(p.text || '').trim();
+    showTry(t, t ? 'Just a test. Nothing was typed anywhere.' : (p.note || 'Nothing heard. Try again.'));
     send('get_home');
   }
+  function entryRow(e, opts){
+    const row = el('div', 'item'), body = el('div', 'item-body'), acts = el('div', 'item-acts');
+    const text = el('div', 'item-text sel' + (opts.clamp ? ' clamp' : ''), e.text || '');
+    const meta = el('div', 'item-meta'); meta.appendChild(el('span', '', fmtTime(e.ts)));
+    (opts.tags || []).forEach(t => { if (t) meta.appendChild(el('span', 'tag', t)); });
+    body.appendChild(text); body.appendChild(meta);
+    (opts.buttons || []).forEach(b => acts.appendChild(b));
+    acts.appendChild(copyBtn(e.text || ''));
+    row.appendChild(body); row.appendChild(acts);
+    return row;
+  }
   function onHome(p){
+    if (p.ptt_key) home.ptt = p.ptt_key;
+    home.enabled = p.enabled !== false; home.alert = p.alert || null;
+    // Until the language list arrives, Home's own line names the language.
+    if (!lang.primary && p.language){ lang.primary = p.language; if (p.language_name) lang.primaryName = p.language_name; }
+    renderStatus(); renderLanguageCards();
     const s = p.stats || {};
-    document.getElementById('stToday').textContent = s.today != null ? s.today : '0';
-    document.getElementById('stWords').textContent = s.words_week != null ? s.words_week.toLocaleString() : '0';
-    document.getElementById('stTotal').textContent = s.total != null ? s.total : '0';
-    document.getElementById('stLang').textContent = LANG[p.language] || p.language || '—';
-    document.getElementById('homeKey').textContent = KEYLABEL[p.ptt_key] || 'Left ⌥';
-    const recent = p.recent || [], box = document.getElementById('recent');
-    if (!recent.length){ box.innerHTML = '<div class="empty">No history yet. Dictate something!</div>'; return; }
-    box.innerHTML = '';
-    recent.forEach(e => {
-      const row = document.createElement('div'); row.className = 'row';
-      row.innerHTML = '<span class="t">' + fmtTime(e.ts) + '</span><span class="x"></span><span class="badge">' + (e.mode||'') + '</span>';
-      row.querySelector('.x').textContent = e.text;
-      box.appendChild(row);
-    });
+    $('recentAside').textContent = s.today ? (s.today + ' today') : '';
+    const box = $('recent'), recent = (p.recent || []).slice(0, 5);
+    box.textContent = '';
+    if (!recent.length){ box.appendChild(el('div', 'empty', 'Your dictations will show up here.')); return; }
+    recent.forEach(e => box.appendChild(entryRow(e, {clamp: true})));
+    if ((+s.total || 0) > recent.length){
+      const more = el('div', 'row more'), b = el('button', 'btn plain', 'Show all');
+      b.id = 'showAll'; b.addEventListener('click', () => go('history'));
+      more.appendChild(b); box.appendChild(more);
+    }
   }
 
-  // history
-  const hsearch = document.getElementById('hsearch'), hlist = document.getElementById('hlist');
-  const saveToggle = document.getElementById('saveToggle'), clearBtn = document.getElementById('clearBtn');
-  let searchTimer = null;
-  let savedSet = new Set();
-  hsearch.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => send('get_history', { query: hsearch.value.trim() }), 200); });
-  saveToggle.addEventListener('click', () => { saveToggle.classList.toggle('on'); send('set_save_history', { on: saveToggle.classList.contains('on') }); });
-  clearBtn.addEventListener('click', () => { if (confirm('Clear all dictation history? This cannot be undone.')) send('clear_history'); });
-  function onHistory(p){
-    setToggle(saveToggle, p.save_history !== false);
-    savedSet = new Set(p.saved_uuids || []);
-    const entries = p.entries || [];
-    if (!entries.length){ hlist.innerHTML = '<div class="empty">' + (hsearch.value.trim() ? 'No matches.' : 'No history yet. Dictate something!') + '</div>'; return; }
-    hlist.innerHTML = '';
-    entries.forEach(e => {
-      const el = document.createElement('div'); el.className = 'card hud entry';
-      const lang = LANG[e.language] || e.language || '';
-      const isSaved = savedSet.has(e.uuid);
-      el.innerHTML = '<div class="meta"><span class="t">' + fmtTime(e.ts) + '</span>' +
-        (lang ? '<span class="badge">' + lang + '</span>' : '') +
-        (e.mode === 'test' ? '<span class="badge">test</span>' : '') +
-        '<span class="acts"><button class="heart' + (isSaved ? ' filled' : '') + '" data-history-uuid="' + e.uuid + '">&#9829;</button>' +
-        '<button class="copy">Copy</button></span></div><div class="x"></div>';
-      el.querySelector('.x').textContent = e.text;
-      const cp = el.querySelector('.copy');
-      cp.addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(e.text); cp.textContent='Copied'; setTimeout(()=>cp.textContent='Copy', 1200); });
-      const ht = el.querySelector('.heart');
-      ht.addEventListener('click', () => {
-        if (ht.classList.contains('filled')) {
-          send('unsave_prompt', { history_uuid: e.uuid });
-        } else {
-          send('save_prompt_from_history', { text: e.text, history_uuid: e.uuid });
-        }
-      });
-      hlist.appendChild(el);
+  /* ---------- languages ---------- */
+  // Filled by the `languages` event; until the first one the picker shows
+  // "Loading languages…" with its controls disabled.
+  const lang = {ready: false, error: null, list: [], primary: '', primaryName: '',
+                additional: [], max: 0, hint: null, note: '', pending: null, failed: {}, names: {}};
+  const LEGACY = {en: 'English', hi: 'Hindi', auto: 'Automatic', es: 'Spanish', fr: 'French', de: 'German',
+                  zh: 'Chinese', ja: 'Japanese', ar: 'Arabic', pt: 'Portuguese'};
+  const LANG_STATES = ['downloaded', 'available', 'downloading'];
+  const SECOND = 'Second language';
+  function normalizeRow(r, installing){
+    const id = String(r.id || r.code || '');
+    let state = r.state || (r.installed ? 'downloaded' : 'available');
+    if (!LANG_STATES.includes(state)) state = state === 'failed' ? 'available' : (r.installed ? 'downloaded' : 'available');
+    let progress = r.progress != null ? +r.progress : (+r.fraction || 0);
+    if (installing && typeof installing === 'object'){
+      const k = Object.keys(installing).find(k => same(k, id));
+      if (k != null){ state = 'downloading'; progress = +installing[k] || 0; }
+    }
+    return {id: id, name: String(r.name || id), state: state, progress: progress || 0};
+  }
+  function langRow(id){ return lang.list.find(l => same(l.id, id)); }
+  function langName(id){
+    const r = langRow(id);
+    if (r) return r.name;
+    if (same(id, lang.primary) && lang.primaryName) return lang.primaryName;
+    return lang.names[id] || LEGACY[id] || id || '';
+  }
+  function usable(){ return lang.ready && !lang.error; }
+  function setLangMsg(text, cls, clearAfter){
+    const m = $('langMsg'); m.className = 'group-foot ' + (cls || ''); m.textContent = text || '';
+    clearTimeout(setLangMsg.t);
+    if (clearAfter) setLangMsg.t = setTimeout(() => { m.textContent = ''; }, clearAfter);
+  }
+  function stateBadge(r){
+    const wrap = el('div', 'lang-badge');
+    if (!r || r.state === 'downloaded') return wrap;      // ready: nothing to say
+    if (r.state === 'downloading'){
+      wrap.appendChild(progressBar(r.id, r.progress));
+      const t = el('span', '', 'Downloading ' + pct(r.progress) + '%'); t.dataset.pctOf = r.id; t.dataset.prefix = 'Downloading '; t.dataset.suffix = '%';
+      wrap.appendChild(t);
+    } else {
+      const b = el('button', 'btn', retryLabel(r.id)); b.dataset.download = r.id; wrap.appendChild(b);
+    }
+    return wrap;
+  }
+  // A download that did not finish offers "Try again" instead of "Download".
+  function didFail(id){ return Object.keys(lang.failed).some(k => same(k, id)); }
+  function retryLabel(id){ return didFail(id) ? 'Try again' : 'Download'; }
+  function clearFailed(id){ Object.keys(lang.failed).forEach(k => { if (same(k, id)) delete lang.failed[k]; }); }
+  function mainState(){
+    const box = el('div', 'lang-state'); box.dataset.role = 'main-state';
+    if (!usable()) return box;
+    if (lang.pending){
+      const r = langRow(lang.pending), name = langName(lang.pending), f = r ? r.progress : 0;
+      const t = el('span', '', ''); t.dataset.pctOf = lang.pending;
+      t.dataset.prefix = 'Downloading ' + name + '… '; t.dataset.suffix = '%. freeflo switches to it when it is ready.';
+      t.textContent = t.dataset.prefix + pct(f) + t.dataset.suffix;
+      box.appendChild(t); box.appendChild(progressBar(lang.pending, f));
+      return box;
+    }
+    const r = langRow(lang.primary);
+    if (!r || r.state === 'downloaded') return box;      // ready: nothing to say
+    if (r.state === 'downloading'){
+      const t = el('span', '', 'Downloading ' + pct(r.progress) + '%'); t.dataset.pctOf = r.id; t.dataset.prefix = 'Downloading '; t.dataset.suffix = '%';
+      box.appendChild(t); box.appendChild(progressBar(r.id, r.progress));
+    } else {
+      box.appendChild(el('span', '', didFail(r.id) ? 'The download did not finish.' : 'Needs a one-time download.'));
+      const b = el('button', 'btn', retryLabel(r.id)); b.dataset.download = r.id; box.appendChild(b);
+    }
+    return box;
+  }
+  function fillMain(sel){
+    sel.textContent = '';
+    if (!usable()){
+      const o = el('option', '', langName(lang.primary) || 'Loading…'); o.value = lang.primary || '';
+      sel.appendChild(o); sel.disabled = true; return;
+    }
+    sel.disabled = false;
+    [['Ready to use', lang.list.filter(l => l.state === 'downloaded')],
+     ['Download to use', lang.list.filter(l => l.state !== 'downloaded')]].forEach(g => {
+      if (!g[1].length) return;
+      const og = document.createElement('optgroup'); og.label = g[0];
+      g[1].forEach(l => { const o = el('option', '', l.name); o.value = l.id; og.appendChild(o); });
+      sel.appendChild(og);
     });
+    const cur = langRow(lang.primary);
+    if (cur) sel.value = cur.id;
+    else if (lang.primary){ const o = el('option', '', langName(lang.primary)); o.value = lang.primary; sel.insertBefore(o, sel.firstChild); sel.value = lang.primary; }
+  }
+  function hintToShow(){
+    const h = lang.hint;
+    if (!h || !h.id || !usable()) return null;
+    if (same(h.id, lang.primary) || lang.additional.some(a => same(a, h.id))) return null;
+    return h;
+  }
+  function footText(){
+    if (lang.error) return {text: lang.error, cls: 'err'};
+    if (!lang.ready) return {text: 'Loading languages…', cls: ''};
+    return {text: lang.note || '', cls: ''};
+  }
+  function langSignature(compact){
+    return JSON.stringify([compact, lang.ready, lang.error, lang.primary, lang.primaryName, lang.additional,
+      lang.max, hintToShow(), lang.note, lang.pending, Object.keys(lang.failed), lang.list.map(l => [l.id, l.name, l.state])]);
+  }
+  function buildLanguageCard(host, opts){
+    const compact = !!(opts && opts.compact), sig = langSignature(compact);
+    const foot = opts && opts.foot;
+    if (foot){ const f = footText(); foot.textContent = f.text; foot.className = 'group-foot' + (f.cls ? ' ' + f.cls : ''); }
+    if (host._sig === sig){ refreshProgress(host); return; }   // same structure: only move the numbers
+    host._sig = sig;
+    host.textContent = '';
+    const ok = usable();
+    // A: main language
+    const rowA = el('div', 'row'), label = el('div', 'row-label');
+    label.appendChild(el('div', '', compact ? 'I speak' : 'Main language'));
+    label.appendChild(mainState());
+    const sel = el('select', 'select'); sel.dataset.role = 'main'; sel.setAttribute('aria-label', compact ? 'I speak' : 'Main language');
+    fillMain(sel);
+    sel.addEventListener('change', () => chooseMain(sel.value));
+    const ctl = el('div', 'row-ctl'); ctl.appendChild(sel);
+    rowA.appendChild(label); rowA.appendChild(ctl); host.appendChild(rowA);
+    // B: the other languages freeflo listens for
+    if (lang.max > 0){
+      // The language, with what it is underneath (as in System Settings >
+      // Language & Region); its download state and Remove on the right.
+      lang.additional.forEach(id => {
+        const row = el('div', 'row'), name = langName(id), l = el('div', 'row-label'); row.dataset.code = id;
+        l.appendChild(el('div', 'lang-name', name));
+        l.appendChild(el('div', 'row-desc', SECOND));
+        row.appendChild(l);
+        row.appendChild(stateBadge(langRow(id)));
+        const x = el('button', 'x', '×'); x.title = 'Remove ' + name; x.setAttribute('aria-label', x.title);
+        x.addEventListener('click', () => removeLanguage(id));
+        row.appendChild(x); host.appendChild(row);
+      });
+      // C: add one
+      if (ok && lang.max > lang.additional.length){
+        // No second language yet: the row is already there, set to None.
+        const first = !lang.additional.length, title = first ? SECOND : 'Add another';
+        const row = el('div', 'row'), add = el('select', 'select'); add.dataset.role = 'add'; add.setAttribute('aria-label', title);
+        const ph = el('option', '', first ? 'None' : 'Choose…'); ph.value = ''; add.appendChild(ph);
+        lang.list.filter(l => !same(l.id, lang.primary) && !lang.additional.some(a => same(a, l.id)))
+          .forEach(l => { const o = el('option', '', l.name + (l.state === 'downloaded' ? '' : ' (download)')); o.value = l.id; add.appendChild(o); });
+        add.addEventListener('change', () => { if (add.value) addLanguage(add.value); });
+        row.appendChild(el('div', 'row-label', title));
+        const c = el('div', 'row-ctl'); c.appendChild(add); row.appendChild(c); host.appendChild(row);
+      }
+    }
+    // H: a suggestion from Python
+    const h = hintToShow();
+    if (h){
+      const row = el('div', 'row'), l = el('div', 'row-label'); row.dataset.role = 'hint';
+      l.appendChild(el('div', '', h.title || langName(h.id)));
+      if (h.text) l.appendChild(el('div', 'row-desc', h.text));
+      const b = el('button', 'btn', h.button || 'Add'); b.dataset.hint = h.id;
+      b.addEventListener('click', () => { if (h.role === 'primary') chooseMain(h.id); else addLanguage(h.id); });
+      row.appendChild(l); row.appendChild(b); host.appendChild(row);
+    }
+    host.querySelectorAll('[data-download]').forEach(b => b.addEventListener('click', () => download(b.dataset.download)));
+    if (!ok) host.querySelectorAll('button, select').forEach(c => { c.disabled = true; });
+  }
+  function refreshProgress(host){
+    host.querySelectorAll('[data-pct-of]').forEach(t => { const r = langRow(t.dataset.pctOf); t.textContent = t.dataset.prefix + pct(r ? r.progress : 0) + t.dataset.suffix; });
+    host.querySelectorAll('[data-bar-of]').forEach(i => { const r = langRow(i.dataset.barOf); i.style.width = pct(r ? r.progress : 0) + '%'; });
+  }
+  // Home: one read-only line ("English (India) + Hindi") and a way to the
+  // editor in Settings. A chosen language that is not here yet says so.
+  function buildHomeLanguage(host){
+    const chosen = [lang.primary].concat(lang.additional).filter(Boolean);
+    const sig = JSON.stringify(['home', lang.ready, lang.error, chosen, chosen.map(langName), lang.pending,
+      chosen.concat(lang.pending ? [lang.pending] : []).map(id => { const r = langRow(id); return r ? r.state : ''; })]);
+    if (host._sig === sig){ refreshProgress(host); return; }
+    host._sig = sig;
+    host.textContent = '';
+    const row = el('div', 'row'), label = el('div', 'row-label');
+    row.dataset.role = 'home-language';
+    const title = el('div', '', chosen.length ? chosen.map(langName).join(' + ') : 'Loading…');
+    title.dataset.role = 'label';
+    label.appendChild(title);
+    const lines = [];
+    function progressLine(id, prefix, suffix){
+      const t = el('div', 'row-desc'); t.dataset.pctOf = id; t.dataset.prefix = prefix; t.dataset.suffix = suffix;
+      const r = langRow(id); t.textContent = prefix + pct(r ? r.progress : 0) + suffix; return t;
+    }
+    if (lang.error) lines.push(el('div', 'row-desc', lang.error));
+    else if (usable()){
+      if (lang.pending) lines.push(progressLine(lang.pending, 'Switching to ' + langName(lang.pending) + ' when its download is done (', '%).'));
+      chosen.forEach(id => {
+        const r = langRow(id);
+        if (!r || r.state === 'downloaded') return;
+        if (r.state === 'downloading') lines.push(progressLine(id, langName(id) + ' is downloading (', '%).'));
+        else lines.push(el('div', 'row-desc', langName(id) + ' isn’t downloaded yet.'));
+      });
+    }
+    lines.forEach(l => { l.dataset.status = '1'; label.appendChild(l); });
+    const b = el('button', 'btn', 'Change…'); b.dataset.role = 'change';
+    b.addEventListener('click', () => go('settings', 'language'));
+    row.appendChild(label); row.appendChild(b); host.appendChild(row);
+  }
+  function renderLanguageCards(){
+    buildHomeLanguage($('homeLangCard'));
+    buildLanguageCard($('langCard'), {compact: false, foot: $('langFoot')});
+    if ($('hero')) renderStatus();
+  }
+  function markDownloading(id){ clearFailed(id); const r = langRow(id); if (r && r.state !== 'downloaded' && r.state !== 'downloading'){ r.state = 'downloading'; r.progress = 0; } }
+  function setLanguages(primary, additional){
+    lang.primary = primary; lang.additional = additional.slice();
+    [primary].concat(additional).forEach(markDownloading);
+    setLangMsg('');
+    renderLanguageCards();
+    send('set_languages', {primary: primary, additional: additional.slice()});
+  }
+  function chooseMain(id){
+    if (!id || same(id, lang.primary)){ renderLanguageCards(); return; }
+    // Picking a language that is already the second one swaps the two.
+    const add = lang.additional.slice(), i = add.findIndex(a => same(a, id));
+    if (i >= 0){ if (lang.primary) add[i] = lang.primary; else add.splice(i, 1); }
+    setLanguages(id, add);
+  }
+  function addLanguage(id){
+    if (!id || same(id, lang.primary) || lang.additional.some(a => same(a, id))) return;
+    setLanguages(lang.primary, lang.additional.concat([id]));
+  }
+  function removeLanguage(id){ setLanguages(lang.primary, lang.additional.filter(a => !same(a, id))); }
+  function download(id){
+    if (!id) return;
+    markDownloading(id); renderLanguageCards();
+    send('install_language', {id: id, code: id});
+  }
+  function onLanguages(p){
+    lang.list = (Array.isArray(p.languages) ? p.languages : []).map(r => normalizeRow(r, p.installing));
+    if (p.primary) lang.primary = String(p.primary);
+    lang.additional = Array.isArray(p.additional) ? p.additional.map(String) : [];
+    lang.max = Math.max(0, +p.max_additional || 0);
+    lang.ready = ('ready' in p) ? !!p.ready : lang.list.length > 0;
+    lang.error = p.error || null;
+    lang.hint = (p.hint && typeof p.hint === 'object') ? p.hint : null;
+    lang.note = p.note || '';
+    // A main language still downloading: the old one stays in use until then.
+    lang.pending = p.pending ? String(p.pending) : null;
+    lang.failed = (p.failed && typeof p.failed === 'object' && !Array.isArray(p.failed)) ? Object.assign({}, p.failed) : {};
+    renderLanguageCards();
+  }
+  function onLanguageProgress(p){
+    const id = p.id || p.code; if (!id) return;
+    const r = langRow(id), name = p.name || (r && r.name) || langName(id);
+    if (p.state === 'downloading'){
+      clearFailed(id);
+      if (r){ r.state = 'downloading'; r.progress = +p.progress || 0; }
+    } else if (p.state === 'downloaded'){
+      clearFailed(id);
+      if (r){ r.state = 'downloaded'; r.progress = 1; }
+      if (same(lang.pending, id)) lang.pending = null;
+      setLangMsg(name + ' is ready.', 'ok', 4000);
+    } else if (p.state === 'failed'){
+      if (r){ r.state = 'available'; r.progress = 0; }
+      if (same(lang.pending, id)) lang.pending = null;
+      lang.failed[id] = p.message || true;
+      setLangMsg(p.message || ('Couldn’t download ' + name + '. Check your internet connection and try again.'), 'err');
+    }
+    renderLanguageCards();
+  }
+
+  /* ---------- shortcuts ---------- */
+  let keysList = [];
+  function fillKeys(sel, value){
+    sel.textContent = '';
+    keysList.forEach(k => { const o = el('option', '', k.label); o.value = k.id; sel.appendChild(o); });
+    sel.value = value;
+  }
+  function onShortcuts(p){
+    keysList = Array.isArray(p.keys) ? p.keys : keysList;
+    keysList.forEach(k => { if (!KEYS[k.id]) KEYS[k.id] = k.label; });
+    if (p.ptt_key) home.ptt = p.ptt_key;
+    if (p.toggle_key) home.toggle = p.toggle_key;
+    fillKeys($('pttKey'), home.ptt); fillKeys($('toggleKey'), home.toggle);
+    setSwitch($('liveSwitch'), !!p.live_text); setSwitch($('soundSwitch'), !!p.sound);
+    renderStatus();
+  }
+  function saveKeys(changed){
+    let ptt = $('pttKey').value, tog = $('toggleKey').value;
+    if (ptt === tog){                      // picked the other one's key: swap them
+      if (changed === 'ptt'){ tog = home.ptt; $('toggleKey').value = tog; }
+      else { ptt = home.toggle; $('pttKey').value = ptt; }
+    }
+    home.ptt = ptt; home.toggle = tog; renderStatus();
+    send('set_shortcuts', {ptt_key: ptt, toggle_key: tog});
+  }
+  $('pttKey').addEventListener('change', () => saveKeys('ptt'));
+  $('toggleKey').addEventListener('change', () => saveKeys('toggle'));
+  function onShortcutsSaved(p){
+    const m = $('scMsg'); m.className = p.ok ? 'ok' : 'err';
+    m.textContent = p.ok ? 'Saved.' : (p.error || 'Could not save that.');
+    if (!p.ok) send('get_shortcuts');
+    clearTimeout(onShortcutsSaved.t);
+    onShortcutsSaved.t = setTimeout(() => { m.textContent = ''; }, 2600);
+  }
+  onSwitch($('liveSwitch'), on => send('set_live_text', {on: on}));
+  onSwitch($('soundSwitch'), on => send('set_sound', {on: on}));
+
+  /* ---------- history + saved ---------- */
+  let histTab = 'all', searchTimer = null, savedSet = new Set();
+  function loadHistory(){
+    const q = $('hsearch').value.trim();
+    show($('addSavedBtn'), histTab === 'saved');
+    if (histTab !== 'saved') show($('addForm'), false);
+    $('hsearch').setAttribute('aria-label', histTab === 'saved' ? 'Search saved' : 'Search history');
+    if (histTab === 'saved') send('get_saved_prompts', {query: q}); else send('get_history', {query: q});
+  }
+  $('histTabs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    histTab = b.dataset.tab; setSeg($('histTabs'), 'tab', histTab); loadHistory();
+  });
+  $('hsearch').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadHistory, 200); });
+  $('hsearch').addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); $('hsearch').value = ''; clearTimeout(searchTimer); loadHistory(); } });
+  function paintStar(b, uuid){
+    const on = savedSet.has(uuid); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.title = on ? 'Saved' : 'Save'; b.setAttribute('aria-label', b.title);
+  }
+  function starBtn(e){
+    const b = iconBtn('star', 'Save', 'star'); b.dataset.uuid = e.uuid || '';
+    paintStar(b, e.uuid);
+    b.addEventListener('click', () => {
+      if (savedSet.has(e.uuid)){ savedSet.delete(e.uuid); send('unsave_prompt', {history_uuid: e.uuid}); }
+      else { savedSet.add(e.uuid); send('save_prompt_from_history', {text: e.text, history_uuid: e.uuid}); }
+      paintStar(b, e.uuid);
+    });
+    return b;
+  }
+  function onHistory(p){
+    setSwitch($('saveSwitch'), p.save_history !== false);
+    Object.assign(lang.names, p.lang_names || {});
+    savedSet = new Set(p.saved_uuids || []);
+    if (histTab !== 'all') return;
+    const list = $('hlist'), entries = p.entries || []; list.textContent = '';
+    if (!entries.length){ list.appendChild(el('div', 'empty', $('hsearch').value.trim() ? 'Nothing matches that search.' : 'Your dictations will show up here.')); return; }
+    const many = new Set(entries.map(e => e.language).filter(Boolean)).size > 1;
+    entries.forEach(e => list.appendChild(entryRow(e, {
+      tags: [many && e.language ? langName(e.language) : '', e.mode === 'test' ? 'Test' : ''],
+      buttons: e.uuid ? [starBtn(e)] : []
+    })));
   }
   function onSavedUuids(p){
     savedSet = new Set(p.uuids || []);
-    document.querySelectorAll('#hlist .heart').forEach(ht => {
-      const uuid = ht.dataset.historyUuid;
-      ht.classList.toggle('filled', savedSet.has(uuid));
-    });
+    document.querySelectorAll('#hlist .star').forEach(b => paintStar(b, b.dataset.uuid));
   }
-
-  // saved prompts
-  const ssearch = document.getElementById('ssearch'), slist = document.getElementById('slist');
-  const addForm = document.getElementById('addForm'), addText = document.getElementById('addText');
-  let savedSearchTimer = null;
-  ssearch.addEventListener('input', () => { clearTimeout(savedSearchTimer); savedSearchTimer = setTimeout(() => send('get_saved_prompts', { query: ssearch.value.trim() }), 200); });
-  document.getElementById('addSavedBtn').addEventListener('click', () => { addForm.style.display = ''; addText.value = ''; addText.focus(); });
-  document.getElementById('addCancelBtn').addEventListener('click', () => { addForm.style.display = 'none'; });
-  document.getElementById('addSaveBtn').addEventListener('click', () => {
-    const t = addText.value.trim();
-    if (!t) return;
-    send('add_manual_prompt', { text: t });
-    addForm.style.display = 'none';
-  });
-  function onSavedPrompts(p){
-    const entries = p.entries || [];
-    if (!entries.length){ slist.innerHTML = '<div class="empty">' + (ssearch.value.trim() ? 'No matches.' : 'No saved prompts yet. Save one from History or add manually.') + '</div>'; return; }
-    slist.innerHTML = '';
+  function onSaved(p){
+    if (histTab !== 'saved') return;
+    const list = $('hlist'), entries = p.entries || []; list.textContent = '';
+    if (!entries.length){ list.appendChild(el('div', 'empty', $('hsearch').value.trim() ? 'Nothing matches that search.' : 'Nothing saved yet. Tap the star next to a dictation to keep it here.')); return; }
     entries.forEach(e => {
-      const el = document.createElement('div'); el.className = 'card hud entry';
-      el.innerHTML = '<div class="meta"><span class="t">' + fmtTime(e.ts) + '</span>' +
-        '<span class="acts"><button class="copy">Copy</button>' +
-        '<button class="copy" style="color:#ff8f8f">Remove</button></span></div><div class="x"></div>';
-      el.querySelector('.x').textContent = e.text;
-      const btns = el.querySelectorAll('.copy');
-      btns[0].addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(e.text); btns[0].textContent='Copied'; setTimeout(()=>btns[0].textContent='Copy', 1200); });
-      btns[1].addEventListener('click', () => { send('remove_saved_prompt', { uuid: e.uuid }); });
-      slist.appendChild(el);
+      const rm = iconBtn('trash', 'Remove'); rm.classList.add('remove');
+      rm.addEventListener('click', () => send('remove_saved_prompt', {uuid: e.uuid}));
+      list.appendChild(entryRow(e, {buttons: [rm]}));
     });
+  }
+  $('addSavedBtn').addEventListener('click', () => { show($('addForm'), true); $('addText').value = ''; $('addText').focus(); });
+  $('addCancelBtn').addEventListener('click', () => show($('addForm'), false));
+  $('addSaveBtn').addEventListener('click', () => {
+    const t = $('addText').value.trim(); if (!t) return;
+    send('add_manual_prompt', {text: t}); show($('addForm'), false);
+  });
+
+  /* ---------- vocabulary ---------- */
+  function addWord(){ const i = $('vWord'), w = i.value.trim(); if (!w) return; send('vocab_add_word', {word: w}); i.value = ''; i.focus(); }
+  function addRep(){
+    const h = $('vHeard'), w = $('vWritten');
+    if (!h.value.trim()){ h.focus(); return; }
+    if (!w.value.trim()){ w.focus(); return; }
+    send('vocab_add_replacement', {heard: h.value.trim(), written: w.value.trim()}); h.value = ''; w.value = ''; h.focus();
+  }
+  $('vWordAdd').addEventListener('click', addWord);
+  $('vRepAdd').addEventListener('click', addRep);
+  $('vWord').addEventListener('keydown', e => { if (e.key === 'Enter') addWord(); });
+  $('vHeard').addEventListener('keydown', e => { if (e.key === 'Enter') $('vWritten').focus(); });
+  $('vWritten').addEventListener('keydown', e => { if (e.key === 'Enter') addRep(); });
+  function onVocabulary(p){
+    const words = $('vWords'), reps = $('vReps'); words.textContent = ''; reps.textContent = '';
+    (p.words || []).forEach(w => {
+      const c = el('span', 'chip'); c.appendChild(el('span', 'sel', w));
+      const x = el('button', 'x', '×'); x.title = 'Remove ' + w; x.setAttribute('aria-label', x.title);
+      x.addEventListener('click', () => send('vocab_remove_word', {word: w})); c.appendChild(x); words.appendChild(c);
+    });
+    (p.replacements || []).forEach(r => {
+      const row = el('div', 'rep');
+      const h = el('span', 'h', r.heard); h.title = r.heard;
+      const w = el('span', 'w', r.written); w.title = r.written;
+      const x = el('button', 'x', '×'); x.title = 'Remove'; x.setAttribute('aria-label', 'Remove ' + r.heard);
+      x.addEventListener('click', () => send('vocab_remove_replacement', {heard: r.heard}));
+      row.appendChild(h); row.appendChild(el('span', 'arrow', '→')); row.appendChild(w); row.appendChild(x); reps.appendChild(row);
+    });
+    const m = $('vMsg'); m.className = 'group-foot' + (p.error ? ' err' : ''); m.textContent = p.error || p.hint || '';
   }
 
-  // shortcuts
-  let pttKey = 'left_option', toggleKey = 'right_option';
-  function buildKeyPicker(el, keys, selected, onPick){
-    el.innerHTML = '';
-    keys.forEach(k => {
-      const o = document.createElement('span'); o.className = 'opt' + (k.id===selected ? ' sel' : ''); o.textContent = k.label;
-      o.addEventListener('click', () => onPick(k.id)); el.appendChild(o);
-    });
-  }
-  function onShortcuts(p){
-    pttKey = p.ptt_key; toggleKey = p.toggle_key;
-    buildKeyPicker(document.getElementById('pttPicker'), p.keys||[], pttKey, id => { pttKey=id; send('set_shortcuts',{ptt_key:pttKey,toggle_key:toggleKey}); });
-    buildKeyPicker(document.getElementById('togglePicker'), p.keys||[], toggleKey, id => { toggleKey=id; send('set_shortcuts',{ptt_key:pttKey,toggle_key:toggleKey}); });
-    const lp = document.getElementById('langPicker'); lp.innerHTML = ''; let matched = false;
-    (p.languages||[]).forEach(l => {
-      const sel = (!matched && l.code===p.language); if(sel) matched=true;
-      const o = document.createElement('span'); o.className = 'opt'+(sel?' sel':''); o.textContent = l.name;
-      o.addEventListener('click', () => send('set_language',{code:l.code})); lp.appendChild(o);
-    });
-  }
-  function onShortcutsSaved(p){
-    const m = document.getElementById('scMsg');
-    m.className = 'savemsg ' + (p.ok ? 'ok' : 'err');
-    m.textContent = p.ok ? 'Saved — active now.' : (p.error || 'Could not save.');
-    setTimeout(() => { m.textContent = ''; }, 2600);
-  }
-
-  // backup
-  const bMsg = document.getElementById('bMsg');
-  function onBackupStatus(p){
-    document.getElementById('bUnavailable').style.display = p.configured ? 'none' : 'flex';
-    document.getElementById('bDisconnected').style.display = (p.configured && !p.connected) ? 'flex' : 'none';
-    document.getElementById('bConnected').style.display = (p.configured && p.connected) ? 'block' : 'none';
-    const cb = document.getElementById('connectBtn'); cb.disabled=false; cb.textContent='Connect';
+  /* ---------- backup ---------- */
+  let bPending = null;
+  function onBackup(p){
+    show($('bDisconnected'), !!p.configured && !p.connected);
+    show($('bConnected'), !!p.configured && !!p.connected);
+    const cb = $('connectBtn'); cb.disabled = false; cb.textContent = p.reauth ? 'Sign in again' : 'Connect';
     if (p.connected){
-      document.getElementById('bEmail').textContent = p.email || 'Connected';
-      setToggle(document.getElementById('bEnabledToggle'), !!p.enabled);
-      document.getElementById('bLastSynced').textContent = p.syncing ? 'Syncing…' : (p.last_synced ? 'Last synced ' + fmtTime(p.last_synced) : 'Not synced yet.');
+      $('bEmail').textContent = p.email || 'Google Drive';
+      setSwitch($('bEnabledSwitch'), !!p.enabled);
+      $('bLastSynced').textContent = p.syncing ? 'Backing up…' : (p.last_synced ? 'Last backed up ' + fmtTime(p.last_synced) : 'Not backed up yet.');
+      $('syncNowBtn').disabled = !!p.syncing;
     }
-    bMsg.textContent = p.error || '';
+    $('bMsg').textContent = p.error || '';
+    askBackup(null);
   }
-  document.getElementById('connectBtn').addEventListener('click', e => { e.target.disabled=true; e.target.textContent='Connecting…'; send('google_connect'); });
-  document.getElementById('syncNowBtn').addEventListener('click', () => send('backup_sync_now'));
-  document.getElementById('bEnabledToggle').addEventListener('click', () => { const t=document.getElementById('bEnabledToggle'); t.classList.toggle('on'); send('set_backup_enabled',{on:t.classList.contains('on')}); });
-  document.getElementById('disconnectBtn').addEventListener('click', () => { if(confirm('Disconnect Google Backup on this Mac? Your history stays, and the Drive backup is kept.')) send('google_disconnect',{delete_remote:false}); });
-  document.getElementById('deleteRemoteBtn').addEventListener('click', () => { if(confirm('Permanently delete your freeflo backup from Google Drive? This also disconnects this Mac and cannot be undone.')) send('google_disconnect',{delete_remote:true}); });
+  function askBackup(kind){
+    bPending = kind;
+    show($('bActions'), !kind); show($('bConfirm'), !!kind);
+    $('bConfirmText').textContent = kind === 'delete' ? 'Delete your backup from Google Drive and disconnect? This cannot be undone.'
+      : kind === 'disconnect' ? 'Disconnect? Your history stays on this Mac and the backup stays in Drive.'
+      : 'Stop using Google Drive on this Mac.';
+    $('bConfirmYes').textContent = kind === 'delete' ? 'Delete backup' : 'Disconnect';
+  }
+  $('connectBtn').addEventListener('click', e => { e.target.disabled = true; e.target.textContent = 'Connecting…'; send('google_connect'); });
+  $('syncNowBtn').addEventListener('click', () => send('backup_sync_now'));
+  onSwitch($('bEnabledSwitch'), on => send('set_backup_enabled', {on: on}));
+  $('disconnectBtn').addEventListener('click', () => askBackup('disconnect'));
+  $('deleteRemoteBtn').addEventListener('click', () => askBackup('delete'));
+  $('bConfirmNo').addEventListener('click', () => askBackup(null));
+  $('bConfirmYes').addEventListener('click', () => { send('google_disconnect', {delete_remote: bPending === 'delete'}); askBackup(null); });
 
-  // privacy
-  const analyticsToggle = document.getElementById('analyticsToggle'), crashToggle = document.getElementById('crashToggle');
-  function onPrivacy(p){ setToggle(analyticsToggle, p.analytics!==false); setToggle(crashToggle, p.crash!==false); }
-  analyticsToggle.addEventListener('click', () => { analyticsToggle.classList.toggle('on'); send('set_privacy',{analytics:analyticsToggle.classList.contains('on')}); });
-  crashToggle.addEventListener('click', () => { crashToggle.classList.toggle('on'); send('set_privacy',{crash:crashToggle.classList.contains('on')}); });
+  /* ---------- privacy ---------- */
+  function onPrivacy(p){ setSwitch($('analyticsSwitch'), p.analytics !== false); setSwitch($('crashSwitch'), p.crash !== false); }
+  onSwitch($('analyticsSwitch'), on => send('set_privacy', {analytics: on}));
+  onSwitch($('crashSwitch'), on => send('set_privacy', {crash: on}));
+  onSwitch($('saveSwitch'), on => send('set_save_history', {on: on}));
+  function askClear(on){
+    show($('clearActions'), !on); show($('clearConfirm'), on);
+    $('clearText').textContent = on ? 'Delete every dictation? This cannot be undone.' : 'Delete all history';
+  }
+  $('clearBtn').addEventListener('click', () => askClear(true));
+  $('clearNo').addEventListener('click', () => askClear(false));
+  $('clearYes').addEventListener('click', () => { send('clear_history'); askClear(false); send('get_home'); });
 
-  // turbo
-  const turboToggle = document.getElementById('turboToggle');
-  turboToggle.addEventListener('click', () => send('set_turbo',{on:!turboToggle.classList.contains('on')}));
-  document.getElementById('turboStyle').addEventListener('change', () => send('set_turbo_style',{style:document.getElementById('turboStyle').value}));
-  document.getElementById('turboDlBtn').addEventListener('click', () => send('download_model',{tier:'lite'}));
-  function onTurboStatus(p){
-    if (p.enabled === undefined) return;   // ignore partial pushes (e.g. needs_download)
-    setToggle(turboToggle, p.enabled);
-    document.getElementById('turboModelsCard').style.display = p.enabled ? '' : 'none';
-    document.getElementById('turboStyle').value = p.style || 'natural';
-    const lite = p.lite || {};
-    document.getElementById('turboDownload').style.display = lite.installed ? 'none' : '';
-    if (!lite.installed && lite.size_gb)
-      document.getElementById('turboDlText').textContent = `One-time ${lite.size_gb} GB download to enable Turbo.`;
+  /* ---------- advanced: turbo ---------- */
+  $('turboSwitch').addEventListener('click', () => send('set_turbo', {on: !isOn($('turboSwitch'))}));
+  $('turboStyle').addEventListener('change', e => send('set_turbo_style', {style: e.target.value}));
+  $('turboDlBtn').addEventListener('click', e => { e.target.disabled = true; e.target.textContent = 'Downloading…'; send('download_model', {tier: 'lite'}); });
+  function onTurbo(p){
+    if (p.enabled === undefined) return;          // partial pushes (needs_download)
+    const none = p.available === false, on = !!p.enabled && !none, lite = p.lite || {};
+    $('turboSwitch').disabled = none; setSwitch($('turboSwitch'), on);
+    $('turboDesc').textContent = none ? 'Not included in this version of freeflo.'
+      : 'Tidies up each dictation on this Mac before it is typed. A little slower.';
+    show($('turboDownload'), on && !lite.installed);
+    show($('turboStyleRow'), on);
+    $('turboStyle').value = p.style || 'natural';
+    if (!lite.installed){
+      $('turboDlText').textContent = 'Turbo needs a one-time download' + (lite.size_gb ? ' (' + lite.size_gb + ' GB).' : '.');
+      if ($('turboBar').hidden){ $('turboDlBtn').disabled = false; $('turboDlBtn').textContent = 'Download'; }
+    } else show($('turboBar'), false);
   }
   function onTurboProgress(p){
-    const bar = document.querySelector('#turboDownload .bar');
-    if (p.error){ alert(p.error); return; }
-    if (bar){ bar.style.display='block'; bar.querySelector('i').style.width=p.pct+'%'; }
+    const bar = $('turboBar'), btn = $('turboDlBtn');
+    if (p.error){ show(bar, false); btn.disabled = false; btn.textContent = 'Try again'; $('turboDlText').textContent = String(p.error); return; }
+    show(bar, true); bar.querySelector('i').style.width = Math.max(0, Math.min(100, +p.pct || 0)) + '%';
+    btn.disabled = true; btn.textContent = Math.round(+p.pct || 0) + '%';
   }
 
-  // feedback
-  const reqType = document.getElementById('reqType');
-  const reqTitle = document.getElementById('reqTitle');
-  const reqDesc = document.getElementById('reqDesc');
-  const reqMsg = document.getElementById('reqMsg');
-  reqType.querySelectorAll('.opt').forEach(o => o.addEventListener('click', () => {
-    reqType.querySelectorAll('.opt').forEach(x => x.classList.remove('sel')); o.classList.add('sel');
-    const isBug = o.textContent === 'Bug report';
-    reqTitle.placeholder = isBug ? 'e.g. Transcription stops mid-sentence' : 'e.g. Add custom vocabulary support';
-    reqDesc.placeholder = isBug ? 'What happened? Include steps to reproduce if possible.' : 'Describe the feature you\'d like or the workflow you wish existed.';
-  }));
-  document.getElementById('reqSend').addEventListener('click', function(){
-    const title = reqTitle.value.trim();
-    if (!title){ reqMsg.style.color='#ff8f8f'; reqMsg.textContent='Please add a title.'; return; }
-    this.disabled=true; this.textContent='Submitting…';
-    const type = reqType.querySelector('.sel').textContent;
-    send('feature_request', { text: type + ': ' + title + (reqDesc.value.trim() ? '\n\n' + reqDesc.value.trim() : '') });
+  /* ---------- advanced: about, troubleshooting, updates ---------- */
+  function onAbout(p){
+    const can = Array.isArray(p.can) ? p.can : [];
+    if (p.version){ $('versionLine').textContent = 'freeflo ' + p.version; show($('versionLine'), true); }
+    show($('logsBtn'), can.includes('reveal_logs')); show($('diagBtn'), can.includes('copy_diagnostics'));
+    show($('diagRow'), can.includes('reveal_logs') || can.includes('copy_diagnostics'));
+    show($('setupRow'), can.includes('open_setup'));
+    show($('updateRow'), can.includes('check_updates'));
+    if (p.version && !$('updateMsg').textContent) $('updateMsg').textContent = 'You have version ' + p.version + '.';
+  }
+  function onUpdateStatus(p){
+    const b = $('updateBtn'); b.disabled = !!p.busy;
+    $('updateMsg').textContent = p.text || '';
+    b.textContent = p.available ? 'Download' : 'Check now';
+    b.dataset.mode = p.available ? 'download' : 'check';
+  }
+  $('logsBtn').addEventListener('click', () => send('reveal_logs'));
+  $('diagBtn').addEventListener('click', () => { send('copy_diagnostics'); $('diagMsg').textContent = 'Copied. Paste it into your message to us.'; });
+  $('setupBtn').addEventListener('click', () => send('open_setup'));
+  $('updateBtn').addEventListener('click', e => {
+    if (e.target.dataset.mode === 'download') send('download_update');
+    else { $('updateMsg').textContent = 'Checking…'; send('check_updates'); }
+  });
+
+  /* ---------- advanced: feedback ---------- */
+  let fbKind = 'Feature request';
+  $('fbType').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    fbKind = b.dataset.kind; setSeg($('fbType'), 'kind', fbKind);
+    $('fbText').placeholder = fbKind === 'Bug report' ? 'What happened, and what did you expect?' : 'What would make freeflo better?';
+  });
+  $('fbSend').addEventListener('click', () => {
+    const t = $('fbText').value.trim(), m = $('fbMsg');
+    if (!t){ m.className = 'msg err'; m.textContent = 'Write a few words first.'; $('fbText').focus(); return; }
+    $('fbSend').disabled = true; m.className = 'msg'; m.textContent = 'Sending…';
+    send('feature_request', {text: fbKind + ': ' + t});
   });
   function onFeatureAck(p){
-    const btn = document.getElementById('reqSend');
-    if (p.ok){ reqMsg.style.color='var(--ok)'; reqMsg.textContent="Submitted — thanks! We'll review this and add it to the roadmap."; reqTitle.value=''; reqDesc.value=''; }
-    else { reqMsg.style.color='#ff8f8f'; reqMsg.textContent='Something went wrong — please try again.'; }
-    btn.disabled=false; btn.textContent='Submit';
-    setTimeout(()=>{ reqMsg.textContent=''; }, 5000);
+    const m = $('fbMsg'); $('fbSend').disabled = false;
+    if (p.ok){ m.className = 'msg ok'; m.textContent = 'Sent. Thank you!'; $('fbText').value = ''; }
+    else { m.className = 'msg err'; m.textContent = 'That did not go through. Try again.'; }
+    setTimeout(() => { m.textContent = ''; }, 5000);
   }
 
-  // boot
+  /* ---------- events from Python (and from ui/window.py) ---------- */
+  const HANDLERS = {
+    navigate: p => go(p.view, p.section),
+    status: onStatus,
+    test_result: onTestResult,
+    home: onHome,
+    history: onHistory,
+    shortcuts: onShortcuts,
+    shortcuts_saved: onShortcutsSaved,
+    save_history_state: p => setSwitch($('saveSwitch'), p.on !== false),
+    backup_status: onBackup,
+    privacy: onPrivacy,
+    theme: onTheme,
+    feature_ack: onFeatureAck,
+    turbo_status: onTurbo,
+    turbo_progress: onTurboProgress,
+    saved_prompts: onSaved,
+    saved_uuids: onSavedUuids,
+    vocabulary: onVocabulary,
+    languages: onLanguages,
+    language_progress: onLanguageProgress,
+    about: onAbout,
+    update_status: onUpdateStatus,
+    window_style: onWindowStyle,
+    window_shown: () => refreshCurrent()
+  };
+  window.freefloReceive = function(name, p){
+    const h = HANDLERS[name];
+    if (h) h(p || {});
+  };
+
+  /* ---------- boot ---------- */
+  if (NATIVE && NATIVE.accent) setAccent(NATIVE.accent);
+  applyLook(); renderStatus(); renderLanguageCards();
   send('get_theme');
   send('get_home');
+  send('get_shortcuts');
+  send('get_languages');
+  send('ui_ready');       // Python may answer with a view to open (e.g. Settings)
 </script>
 </body>
 </html>

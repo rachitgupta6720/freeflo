@@ -1,14 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Hardened-runtime entitlements for the notarized freeflo build.
+  Hardened-runtime entitlements for the notarized freeflo build (the app's
+  Python process).
 
   A py2app/Python bundle loads its own interpreter and several bundled,
-  non-Apple dylibs (portaudio, whisper-cli, compiled crypto/cffi extensions),
-  so library validation must be relaxed and the interpreter needs JIT/writable-
-  executable memory. The microphone entitlement pairs with
-  NSMicrophoneUsageDescription in Info.plist; Apple-events covers the
-  clipboard-paste AppleScript in engine/injector.py.
+  non-Apple dylibs (compiled crypto/cffi extensions for Google sign-in), so
+  library validation must be relaxed and the interpreter needs JIT/writable-
+  executable memory.
+
+  The microphone is opened by the bundled freeflo-helper, a child of this
+  process. It is signed separately with helper/entitlements.plist (audio-input
+  only); the entitlement is kept here as well because macOS attributes the
+  helper's microphone use to the app, alongside NSMicrophoneUsageDescription
+  in Info.plist.
+
+  No Apple-events entitlement: pasting is a synthesised Cmd+V (Quartz), not
+  AppleScript, and needs only the Accessibility permission.
 -->
 <plist version="1.0">
 <dict>
@@ -21,8 +29,6 @@
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <true/>
     <key>com.apple.security.device.audio-input</key>
-    <true/>
-    <key>com.apple.security.automation.apple-events</key>
     <true/>
 </dict>
 </plist>

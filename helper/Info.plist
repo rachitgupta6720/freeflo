@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Embedded into the freeflo-helper executable (__TEXT,__info_plist) by
+  scripts/build_helper.sh. A command-line tool has no bundle, so this is the
+  only place it can carry NSMicrophoneUsageDescription: without it macOS kills
+  a process that asks for the microphone while it is its own "responsible
+  process". Inside freeflo.app the prompt is attributed to the app instead.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.freeflo.helper</string>
+    <key>CFBundleName</key>
+    <string>freeflo-helper</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>26.0</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>freeflo uses the microphone to transcribe your speech on this Mac.</string>
+</dict>
+</plist>
